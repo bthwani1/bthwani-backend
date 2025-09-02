@@ -1,6 +1,17 @@
 // models/SheinCart.ts
 import mongoose, { Schema, Types } from "mongoose";
 
+export interface SheinItem {
+  name: string;
+  price: number;
+  quantity: number;
+  id: string;
+  sheinUrl: string;
+  image?: string;
+  currency?: string;
+  attributes?: Map<string, string>;
+}
+
 const sheinItem = new Schema(
   {
     id: { type: String, required: true }, // url::variantKey

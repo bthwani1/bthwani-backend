@@ -837,22 +837,63 @@ export const vendorAcceptOrder = async (req: Request, res: Response) => {
 
 export const exportOrdersToExcel = async (req, res: Response) => {
   try {
+    const ExcelJS = require('exceljs');
     const orders = await DeliveryOrder.find()
       .populate({ path: "user", select: "fullName phone" })
       .lean();
 
-    // const excelData = orders.map((order) => ({
-    //   OrderID: order._id.toString(),
-    //   Status: order.status,
-    //   Customer: order.user?.fullName || '', // ✅ الآن تعمل
-    //   Phone: order.user?.phone || '',
-    //   Amount: order.price,
-    //   Date: new Date(order.createdAt).toLocaleString('ar-YE'),
-    // }));
+    // Create a new workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Orders');
 
-    // باقي الكود نفسه...
+    // Define columns
+    worksheet.columns = [
+      { header: 'Order ID', key: 'orderId', width: 20 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Customer', key: 'customer', width: 25 },
+      { header: 'Phone', key: 'phone', width: 15 },
+      { header: 'Amount', key: 'amount', width: 12 },
+      { header: 'Date', key: 'date', width: 20 }
+    ];
+
+    // Add data rows
+    orders.forEach(order => {
+      worksheet.addRow({
+        orderId: order._id.toString(),
+        status: order.status,
+        customer: order.user?.fullName || '',
+        phone: order.user?.phone || '',
+        amount: order.price,
+        date: new Date(order.createdAt).toLocaleString('ar-YE')
+      });
+    });
+
+    // Style the header row
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFCCCCCC' }
+    };
+
+    // Set response headers for file download
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="orders-${new Date().toISOString().slice(0, 10)}.xlsx"`
+    );
+
+    // Write to response
+    await workbook.xlsx.write(res);
+    res.end();
+
   } catch (error) {
-    res.status(500).json({ message: "فشل التصدير", error });
+    console.error('Excel export error:', error);
+    res.status(500).json({ message: "فشل التصدير", error: error.message });
   }
 };
 

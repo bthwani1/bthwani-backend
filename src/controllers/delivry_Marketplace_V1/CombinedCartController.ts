@@ -1,7 +1,9 @@
 // controllers/cart/CombinedCartController.ts
 import { Request, Response } from "express";
 import DeliveryCart from "../../models/delivry_Marketplace_V1/DeliveryCart";
-import SheinCart from "../../models/delivry_Marketplace_V1/SheinCart";
+import SheinCart, {
+  SheinItem,
+} from "../../models/delivry_Marketplace_V1/SheinCart";
 import { User } from "../../models/user";
 
 export const getCombinedCart = async (req: Request, res: Response) => {
@@ -14,9 +16,12 @@ export const getCombinedCart = async (req: Request, res: Response) => {
     SheinCart.findOne({ user: user!._id }),
   ]);
 
-  const marketTotal = market?.total || 0;
-  const sheinTotal = (shein?.items || []).reduce(
+  const marketTotal = (market?.items || []).reduce(
     (s, it: any) => s + (it.price || 0) * (it.quantity || 1),
+    0
+  );
+  const sheinTotal = ((shein?.items as SheinItem[]) || []).reduce(
+    (s, it) => s + (it.price ?? 0) * (it.quantity ?? 1),
     0
   );
 
