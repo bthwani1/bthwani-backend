@@ -1,8 +1,9 @@
 import mongoose from "mongoose";
-import admin from "../config/firebaseAdmin"; // Firebase Admin SDK
+import { admin } from "../config/firebaseAdmin";
 import { User } from "../models/user"; // نموذج المستخدم من مشروعك
 
-const MONGO_URI = "mongodb+srv://m775071580:KPU8TxhRilLbgtyB@cluster0.hgb9fu2.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+const MONGO_URI =
+  "mongodb+srv://m775071580:KPU8TxhRilLbgtyB@cluster0.hgb9fu2.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
 
 const email = "admin@bthwani.com";
 const password = "admin1234";
