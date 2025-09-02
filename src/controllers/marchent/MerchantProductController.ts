@@ -150,7 +150,7 @@ export const getMerchantProductById = async (req: Request, res: Response) => {
 
     const promos = await fetchActivePromotions({ city, channel });
 
-    const catalog = mp.product;
+    const catalog = mp.product as any;
     let categories: any[] = [];
     if (catalog?.category) {
       if (Array.isArray(catalog.category)) {
