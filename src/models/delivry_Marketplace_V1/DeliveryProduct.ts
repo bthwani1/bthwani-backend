@@ -17,7 +17,7 @@ export interface IDeliveryProduct extends Document {
   tags: string[];
   rating?: number;
   ratingsCount?: number;
-  avgPrepTimeMin?: number;   // زمن تجهيز هذا الطبق
+  avgPrepTimeMin?: number; // زمن تجهيز هذا الطبق
   isFeatured?: boolean;
   isTrending?: boolean;
   calories?: number;
@@ -28,29 +28,37 @@ export interface IDeliveryProduct extends Document {
 
 const productSchema = new Schema<IDeliveryProduct>(
   {
-    store:       { type: Schema.Types.ObjectId, ref: "DeliveryStore", required: true, index: true },
-    subCategory: { type: Schema.Types.ObjectId, ref: "DeliveryProductSubCategory", index: true },
-    section:     { type: Schema.Types.ObjectId, ref: "StoreSection", index: true },
+    store: {
+      type: Schema.Types.ObjectId,
+      ref: "DeliveryStore",
+      required: true,
+      index: true,
+    },
+    subCategory: {
+      type: Schema.Types.ObjectId,
+      ref: "DeliveryProductSubCategory",
+    },
+    section: { type: Schema.Types.ObjectId, ref: "StoreSection", index: true },
 
-    name:        { type: String, required: true, index: "text" },
+    name: { type: String, required: true, index: "text" },
     description: { type: String },
-    price:       { type: Number, required: true, index: true },
+    price: { type: Number, required: true, index: true },
     originalPrice: { type: Number },
-    image:       { type: String },
+    image: { type: String },
     isAvailable: { type: Boolean, default: true, index: true },
-    isDailyOffer:{ type: Boolean, default: false, index: true },
+    isDailyOffer: { type: Boolean, default: false, index: true },
 
     // جديد
-    tags:           { type: [String], default: [] },
-    rating:         { type: Number, default: 0 },
-    ratingsCount:   { type: Number, default: 0 },
+    tags: { type: [String], default: [] },
+    rating: { type: Number, default: 0 },
+    ratingsCount: { type: Number, default: 0 },
     avgPrepTimeMin: { type: Number, default: 0 },
-    isFeatured:     { type: Boolean, default: false },
-    isTrending:     { type: Boolean, default: false },
-    calories:       { type: Number },
-    allergens:      { type: [String], default: [] },
-    isVeg:          { type: Boolean, default: false },
-    discountPercent:{ type: Number, default: 0 },
+    isFeatured: { type: Boolean, default: false },
+    isTrending: { type: Boolean, default: false },
+    calories: { type: Number },
+    allergens: { type: [String], default: [] },
+    isVeg: { type: Boolean, default: false },
+    discountPercent: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
@@ -59,4 +67,7 @@ productSchema.index({ store: 1, isAvailable: 1 });
 productSchema.index({ store: 1, section: 1 });
 productSchema.index({ subCategory: 1 });
 
-export default mongoose.model<IDeliveryProduct>("DeliveryProduct", productSchema);
+export default mongoose.model<IDeliveryProduct>(
+  "DeliveryProduct",
+  productSchema
+);

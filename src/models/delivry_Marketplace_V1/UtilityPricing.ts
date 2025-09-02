@@ -46,7 +46,7 @@ export interface IUtilityPricing extends Document {
 
 const utilityPricingSchema = new Schema<IUtilityPricing>(
   {
-    city: { type: String, required: true, index: true },
+    city: { type: String, required: true },
     isActive: { type: Boolean, default: true },
 
     origins: {

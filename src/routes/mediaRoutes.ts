@@ -1,30 +1,22 @@
 // src/routes/mediaRoutes.ts
-import dotenv from "dotenv";
-dotenv.config();
-
 import { Router } from "express";
-import crypto from "crypto";
 import { verifyFirebase } from "../middleware/verifyFirebase";
+import crypto from "crypto";
+
 const router = Router();
 
 router.post("/sign-upload", verifyFirebase, (req, res) => {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey    = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  const fileName = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}.jpg`;
 
-  if (!cloudName || !apiKey || !apiSecret) {
-    console.error("⚠️ Cloudinary env misconfigured:", { cloudName, apiKey, apiSecret });
-     res.status(500).json({ message: "Server misconfigured" });
-     return;
-  }
+  // Bunny Storage Zone name
+  const storageZone = process.env.BUNNY_STORAGE_NAME;
+  const cdnBase = process.env.BUNNY_CDN_URL; // مثل https://cdn.bthwani.com
 
-  const folder    = "stores";
-  const timestamp = Math.floor(Date.now() / 1000);
-  // signature: sha1(`folder=${folder}&timestamp=${timestamp}${apiSecret}`)
-  const toSign    = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
-  const signature = crypto.createHash("sha1").update(toSign).digest("hex");
-
-  res.json({ signature, timestamp, apiKey, cloudName, folder });
+  res.json({
+    fileName,
+    uploadUrl: `https://storage.bunnycdn.com/${storageZone}/stores/${fileName}`,
+    publicUrl: `${cdnBase}/stores/${fileName}`,
+  });
 });
 
 export default router;
