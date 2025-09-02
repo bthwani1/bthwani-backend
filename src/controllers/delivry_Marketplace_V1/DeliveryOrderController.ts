@@ -4,7 +4,7 @@ import DeliveryOrder, {
 } from "../../models/delivry_Marketplace_V1/Order";
 import DeliveryCart from "../../models/delivry_Marketplace_V1/DeliveryCart";
 import { User } from "../../models/user";
-import mongoose from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { io } from "../..";
 import DeliveryStore from "../../models/delivry_Marketplace_V1/DeliveryStore";
 import Driver from "../../models/Driver_app/driver";
@@ -444,7 +444,12 @@ export const assignDriver = async (req: Request, res: Response) => {
     const { driverId } = req.body;
     const { id } = req.params;
 
-    const order: any = await DeliveryOrder.findById(id);
+    const order = await DeliveryOrder.findById(id)
+      .populate({ path: "user", select: "fullName phone" })
+      .populate({ path: "driver", select: "fullName phone" })
+      .populate({ path: "subOrders.store", select: "name logo address" })
+      .populate({ path: "subOrders.driver", select: "fullName phone" });
+
     if (!order) {
       res.status(404).json({ message: "Order not found" });
       return;
@@ -465,7 +470,7 @@ export const assignDriver = async (req: Request, res: Response) => {
     // 👇 عالج notes قبل أي حفظ
     order.notes = sanitizeNotes(order.notes);
 
-    order.driver = driver._id;
+    order.driver = driver.id as Types.ObjectId;
     order.status = "assigned"; // 👈 اجعلها حالة إسناد (لو مدعومة عندك)
     order.assignedAt = new Date();
     order.statusHistory.push({
@@ -479,7 +484,7 @@ export const assignDriver = async (req: Request, res: Response) => {
       body: `تم إسناد الطلب إلى الكابتن: ${driver._id}`,
       visibility: "internal",
       byRole: "admin",
-      byId: actor.id,
+      byId: new Types.ObjectId(actor.id),
       createdAt: new Date(),
     });
 
@@ -617,7 +622,12 @@ export const setOrderPOD = async (req: Request, res: Response) => {
       return;
     }
 
-    const order: any = await DeliveryOrder.findById(id);
+    const order = await DeliveryOrder.findById(id)
+      .populate({ path: "user", select: "fullName phone" })
+      .populate({ path: "driver", select: "fullName phone" })
+      .populate({ path: "subOrders.store", select: "name logo address" })
+      .populate({ path: "subOrders.driver", select: "fullName phone" });
+
     if (!order) {
       res.status(404).json({ message: "Order not found" });
       return;
@@ -655,7 +665,12 @@ export const addOrderNote = async (req: Request, res: Response) => {
 
     // لو أردت منع vendor/driver من public: عدّل الشرط أعلاه كما تريد
 
-    const order: any = await DeliveryOrder.findById(id);
+    const order = await DeliveryOrder.findById(id)
+      .populate({ path: "user", select: "fullName phone" })
+      .populate({ path: "driver", select: "fullName phone" })
+      .populate({ path: "subOrders.store", select: "name logo address" })
+      .populate({ path: "subOrders.driver", select: "fullName phone" });
+
     if (!order) {
       res.status(404).json({ message: "Order not found" });
       return;
@@ -688,7 +703,11 @@ export const listOrderNotes = async (req: Request, res: Response) => {
     const actor = getActor(req);
     const scope = (req.query.visibility as string) || "auto"; // auto = حسب الدور
 
-    const order: any = await DeliveryOrder.findById(id).select("notes").lean();
+    const order = await DeliveryOrder.findById(id)
+      .populate({ path: "user", select: "fullName phone" })
+      .populate({ path: "driver", select: "fullName phone" })
+      .populate({ path: "subOrders.store", select: "name logo address" })
+      .populate({ path: "subOrders.driver", select: "fullName phone" });
     if (!order) {
       res.status(404).json({ message: "Order not found" });
       return;
@@ -723,13 +742,17 @@ export const setSubOrderPOD = async (req: Request, res: Response) => {
       return;
     }
 
-    const order: any = await DeliveryOrder.findById(orderId);
+    const order = await DeliveryOrder.findById(orderId)
+      .populate({ path: "user", select: "fullName phone" })
+      .populate({ path: "driver", select: "fullName phone" })
+      .populate({ path: "subOrders.store", select: "name logo address" })
+      .populate({ path: "subOrders.driver", select: "fullName phone" });
     if (!order) {
       res.status(404).json({ message: "Order not found" });
       return;
     }
 
-    const sub = order.subOrders.id(subId);
+    const sub = order.subOrders.find((s: any) => s._id.toString() === subId);
     if (!sub) {
       res.status(404).json({ message: "SubOrder not found" });
       return;
@@ -750,7 +773,11 @@ export const setSubOrderPOD = async (req: Request, res: Response) => {
 
 // PUT /orders/:id/vendor-accept
 export const vendorAcceptOrder = async (req: Request, res: Response) => {
-  const order: any = await DeliveryOrder.findById(req.params.id);
+  const order = await DeliveryOrder.findById(req.params.id)
+    .populate({ path: "user", select: "fullName phone" })
+    .populate({ path: "driver", select: "fullName phone" })
+    .populate({ path: "subOrders.store", select: "name logo address" })
+    .populate({ path: "subOrders.driver", select: "fullName phone" });
   if (!order) {
     res.status(404).json({ message: "Order not found" });
     return;
@@ -798,7 +825,7 @@ export const vendorAcceptOrder = async (req: Request, res: Response) => {
       return;
     }
 
-    order.driver = driver._id; // 👈 اسناد فعلي
+    order.driver = driver._id as Types.ObjectId; // 👈 اسناد فعلي
     if (!order.assignedAt) order.assignedAt = new Date();
   } else {
     // split: اسناد لكل subOrder
@@ -820,7 +847,7 @@ export const vendorAcceptOrder = async (req: Request, res: Response) => {
           },
         },
       });
-      if (drv) sub.driver = drv._id; // 👈 اسناد السائق للـ subOrder
+      if (drv) sub.driver = drv._id as Types.ObjectId; // 👈 اسناد السائق للـ subOrder
     }
     if (!order.assignedAt) order.assignedAt = new Date();
   }
@@ -837,34 +864,34 @@ export const vendorAcceptOrder = async (req: Request, res: Response) => {
 
 export const exportOrdersToExcel = async (req, res: Response) => {
   try {
-    const ExcelJS = require('exceljs');
+    const ExcelJS = require("exceljs");
     const orders = await DeliveryOrder.find()
       .populate({ path: "user", select: "fullName phone" })
       .lean();
 
     // Create a new workbook and worksheet
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Orders');
+    const worksheet = workbook.addWorksheet("Orders");
 
     // Define columns
     worksheet.columns = [
-      { header: 'Order ID', key: 'orderId', width: 20 },
-      { header: 'Status', key: 'status', width: 15 },
-      { header: 'Customer', key: 'customer', width: 25 },
-      { header: 'Phone', key: 'phone', width: 15 },
-      { header: 'Amount', key: 'amount', width: 12 },
-      { header: 'Date', key: 'date', width: 20 }
+      { header: "Order ID", key: "orderId", width: 20 },
+      { header: "Status", key: "status", width: 15 },
+      { header: "Customer", key: "customer", width: 25 },
+      { header: "Phone", key: "phone", width: 15 },
+      { header: "Amount", key: "amount", width: 12 },
+      { header: "Date", key: "date", width: 20 },
     ];
 
     // Add data rows
-    orders.forEach(order => {
+    orders.forEach((order) => {
       worksheet.addRow({
         orderId: order._id.toString(),
         status: order.status,
-        customer: order.user?.fullName || '',
-        phone: order.user?.phone || '',
+        customer: (order.user as any)?.fullName || "",
+        phone: (order.user as any)?.phone || "",
         amount: order.price,
-        date: new Date(order.createdAt).toLocaleString('ar-YE')
+        date: new Date(order.createdAt).toLocaleString("ar-YE"),
       });
     });
 
@@ -872,27 +899,28 @@ export const exportOrdersToExcel = async (req, res: Response) => {
     const headerRow = worksheet.getRow(1);
     headerRow.font = { bold: true };
     headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFCCCCCC' }
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFCCCCCC" },
     };
 
     // Set response headers for file download
     res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
     res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="orders-${new Date().toISOString().slice(0, 10)}.xlsx"`
+      "Content-Disposition",
+      `attachment; filename="orders-${new Date()
+        .toISOString()
+        .slice(0, 10)}.xlsx"`
     );
 
     // Write to response
     await workbook.xlsx.write(res);
     res.end();
-
   } catch (error) {
-    console.error('Excel export error:', error);
+    console.error("Excel export error:", error);
     res.status(500).json({ message: "فشل التصدير", error: error.message });
   }
 };
@@ -1116,7 +1144,7 @@ export const repeatOrder = async (req: Request, res: Response) => {
       res.status(404).json({ message: "Order not found" });
       return;
     }
-    if (!oldOrder.user.equals(user._id)) {
+    if (oldOrder.user.toString() !== user._id.toString()) {
       res.status(403).json({ message: "Not your order" });
       return;
     }
@@ -1288,7 +1316,11 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       return;
     }
 
-    const order: any = await DeliveryOrder.findById(id);
+    const order = await DeliveryOrder.findById(id)
+      .populate({ path: "user", select: "fullName phone" })
+      .populate({ path: "driver", select: "fullName phone" })
+      .populate({ path: "subOrders.store", select: "name logo address" })
+      .populate({ path: "subOrders.driver", select: "fullName phone" });
     if (!order) {
       res.status(404).json({ message: "Order not found" });
       return;

@@ -1,4 +1,6 @@
 import mongoose, { Document, Schema, Types } from "mongoose";
+import { IDriver } from "../Driver_app/driver";
+import { UserType } from "../../types/user.types";
 type OrderType = "marketplace" | "errand" | "utility";
 
 interface IErrandPoint {
@@ -100,8 +102,8 @@ export interface IOrderItem {
 }
 
 export interface IDeliveryOrder extends Document {
-  user: Types.ObjectId;
-  driver?: Types.ObjectId;
+  user: Types.ObjectId | UserType;
+  driver?: Types.ObjectId | IDriver;
   items: IOrderItem[];
 
   subOrders: ISubOrder[];
