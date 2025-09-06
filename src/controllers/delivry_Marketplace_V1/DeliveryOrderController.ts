@@ -23,6 +23,7 @@ import {
 } from "../../services/promotion/pricing.service";
 import DeliveryProduct from "../../models/delivry_Marketplace_V1/DeliveryProduct";
 import MerchantProduct from "../../models/mckathi/MerchantProduct";
+import { notifyOrder } from "../../services/order.notify";
 // 👇 ضِف أعلى هذا الملف
 type CartItem = {
   productId: string;
@@ -417,17 +418,8 @@ export const createOrder = async (req: Request, res: Response) => {
       subCount: order.subOrders.length,
     });
     // 14. إشعار العميل
-    const notif = {
-      title: `طلبك #${order._id} تم إنشاؤه`,
-      body: `المبلغ: ${order.price} ريال. في انتظار تأكيد الإدارة.`,
-      data: { orderId: order._id.toString() },
-      isRead: false,
-      createdAt: new Date(),
-    };
-    await User.findByIdAndUpdate(user._id, {
-      $push: { notificationsFeed: notif },
-    });
-    io.to(`user_${user._id.toString()}`).emit("notification", notif);
+    await notifyOrder("order.created", order);
+
 
     res.status(201).json(order);
     return;
@@ -480,13 +472,7 @@ export const assignDriver = async (req: Request, res: Response) => {
     });
 
     // ملاحظة نظامية
-    order.notes.push({
-      body: `تم إسناد الطلب إلى الكابتن: ${driver._id}`,
-      visibility: "internal",
-      byRole: "admin",
-      byId: new Types.ObjectId(actor.id),
-      createdAt: new Date(),
-    });
+    await notifyOrder("order.assigned", order, { driverId });
 
     await order.save({ validateModifiedOnly: true });
     broadcastOrder("order.driver.assigned", order._id.toString(), { driverId });
@@ -533,6 +519,7 @@ export const assignDriverToSubOrder = async (req: Request, res: Response) => {
       subId,
       driverId,
     });
+    await notifyOrder("order.assigned", order, { driverId });
 
     res.json(order);
   } catch (e: any) {
@@ -589,6 +576,7 @@ export const updateSubOrderStatus = async (req: Request, res: Response) => {
     // مثال: إذا كل subOrders = delivered → order.status=delivered
     if (order.subOrders.every((s: any) => s.status === "delivered")) {
       pushStatusHistory(order, "delivered", "admin");
+      await notifyOrder("order.delivered", order);
     }
 
     await order.save();
@@ -854,6 +842,7 @@ export const vendorAcceptOrder = async (req: Request, res: Response) => {
 
   // الحالة: المتجر بدأ التحضير
   pushStatusHistory(order, "preparing", "store");
+  await notifyOrder("order.preparing", order);
 
   // ⚠️ لو عندك مشكلة موروثة في notes:
   // order.notes = sanitizeNotes(order.notes);
@@ -988,6 +977,8 @@ export const adminChangeStatus = async (req: Request, res: Response) => {
       (e as Error).message
     );
   }
+ 
+  await notifyOrder(status as any, order);
 
   broadcastOrder("order.status", order._id.toString(), {
     status,
@@ -1034,6 +1025,8 @@ export const cancelOrder = async (req: Request, res: Response) => {
       "customer"
     );
     await order.save({ validateModifiedOnly: true });
+    await notifyOrder("order.cancelled", order);
+
     res.json({ message: "Order cancelled", order });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
@@ -1343,6 +1336,8 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       returnBy as any
     );
     await order.save();
+    await notifyOrder(status as any, order);
+
     try {
       await postIfDeliveredOnce(order);
     } catch (e) {
@@ -1352,13 +1347,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       );
     }
     // إشعار مختصر (اختياري)
-    io.to(`user_${order.user.toString()}`).emit("notification", {
-      title: `حالة الطلب #${order._id}`,
-      body: `الحالة: ${status}`,
-      data: { orderId: order._id.toString() },
-      isRead: false,
-      createdAt: new Date(),
-    });
+ 
     broadcastOrder("order.status", order._id.toString(), {
       status,
       by: getActor(req).role,

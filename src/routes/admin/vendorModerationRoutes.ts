@@ -2,6 +2,7 @@ import { Router } from "express";
 import { verifyFirebase } from "../../middleware/verifyFirebase";
 import { requireRole } from "../../middleware/auth";
 import * as c from "../../controllers/admin/vendorModeration.controller";
+import { verifyAdmin } from "../../middleware/verifyAdmin";
 
 const r = Router();
 
@@ -11,7 +12,7 @@ const r = Router();
  *   - name: Admin-Vendors
  *     description: إدارة وتفعيل حسابات التجّار
  */
-r.use(verifyFirebase, requireRole(["admin", "superadmin", "reviewer"]));
+r.use(verifyFirebase,verifyAdmin);
 
 r.get("/admin/vendors", c.list);
 r.get("/admin/vendors/:id", c.getOne);

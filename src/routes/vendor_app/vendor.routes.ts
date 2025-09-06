@@ -14,7 +14,8 @@ import MerchantProduct from "../../models/mckathi/MerchantProduct";
 const router = Router();
 
 // كل المسارات هنا محمية بمستخدم مسجّل من نوع vendor
-router.get("/", verifyFirebase, verifyAdmin, controller.listVendors);
+router.get("/",  verifyFirebase,                   // ← هذا يحلّل الـ JWT ويضع req.user
+  verifyAdmin, controller.listVendors);
 // جلب بيانات التاجر (vendor نفسه)
 router.get("/vendor/me", controller.getMyProfile);
 

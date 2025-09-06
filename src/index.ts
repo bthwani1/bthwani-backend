@@ -6,7 +6,6 @@ import mongoose from "mongoose";
 import cors from "cors";
 import http from "http";
 import { Server as IOServer } from "socket.io";
-import adminNotificationRoutes from "./routes/admin/notification.routes";
 // استيراد Middleware
 import { verifyTokenSocket } from "./middleware/verifyTokenSocket";
 
@@ -69,6 +68,8 @@ import adminReports from "./routes/admin/reportsRoutes";
 import utilityRoutes from "./routes/delivry_marketplace_v1/utility";
 import adminMarketers from "./routes/admin/marketersRoutes";
 import adminStoreModeration from "./routes/admin/storeModerationRoutes";
+import adminNotificationRoutes from "./routes/admin/admin.notifications.routes";
+import rediasRoutes from "./routes/redias";
 
 dotenv.config();
 
@@ -126,11 +127,6 @@ io.on("connection", (socket) => {
       const isAdmin = role === "admin" || role === "superadmin";
       const isOwner =
         socket.data.userId && order.user?.toString() === socket.data.userId;
-
-      // (اختياري) توسعة: السماح للسائق/التاجر — تحتاج vendorId/driverId على socket.data
-      // const isOrderDriver = socket.data.driverId && order.driver?.toString() === socket.data.driverId;
-      // const isSubDriver = socket.data.driverId && (order.subOrders || []).some(s => String(s.driver) === socket.data.driverId);
-      // const isStore = socket.data.vendorId && (order.subOrders || []).some(s => /* تحقق ملكية المتجر */);
 
       if (isAdmin || isOwner /* || isOrderDriver || isSubDriver || isStore */) {
         socket.join(`order_${orderId}`);
@@ -201,6 +197,7 @@ app.use(`${API_PREFIX}/admin/drivers`, adminDriverRoutes);
 app.use(`${API_PREFIX}/driver`, driverRoutes);
 app.use(`${API_PREFIX}/admin/withdrawals`, adminWithdrawalRoutes);
 app.use(`${API_PREFIX}/admin/storestats`, storeStatsRoutes);
+app.use(`${API_PREFIX}/admin/notifications`, adminNotificationRoutes);
 
 // قسم التوصيل والتجارة
 app.use(`${API_PREFIX}/delivery/categories`, deliveryCategoryRoutes);
@@ -231,6 +228,8 @@ app.use(`${API_PREFIX}/`, adminStoreModeration);
 // قسم طلبات وسائق التوصيل
 app.use(`${API_PREFIX}/deliveryapp/withdrawals`, driverWithdrawalRoutes);
 app.use(`${API_PREFIX}/utility`, utilityRoutes);
+app.use(`${API_PREFIX}/redis`, rediasRoutes);
+
 // قسم التاجر
 app.use(`${API_PREFIX}/vendor`, vendorRoutes);
 app.use(`${API_PREFIX}/pricing-strategies`, pricingStrategyRoutes);
