@@ -1,8 +1,8 @@
 // utils/sendEmail.ts
 import nodemailer from "nodemailer";
 
-const FROM_USER = "ceo@bthwani.com";        // يفضَّل no-reply@
-const FROM_PASS = "C*h5u=/iDXJ";            // انقلها إلى .env
+const FROM_USER = "operation@bthwani.com";        // يفضَّل no-reply@
+const FROM_PASS = "yNSTUfS/G1j";            // انقلها إلى .env
 const SMTP_HOST = "smtp.hostinger.com";
 const SMTP_PORT = 465;
 
