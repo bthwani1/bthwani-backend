@@ -228,7 +228,7 @@ app.use(`${API_PREFIX}/`, adminStoreModeration);
 // قسم طلبات وسائق التوصيل
 app.use(`${API_PREFIX}/deliveryapp/withdrawals`, driverWithdrawalRoutes);
 app.use(`${API_PREFIX}/utility`, utilityRoutes);
-app.use(`${API_PREFIX}/redis`, rediasRoutes);
+app.use(`${API_PREFIX}/`, rediasRoutes);
 
 // قسم التاجر
 app.use(`${API_PREFIX}/vendor`, vendorRoutes);

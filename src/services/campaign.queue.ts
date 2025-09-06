@@ -10,15 +10,26 @@ import NotificationCampaign from "../models/NotificationCampaign";
 import { buildAudience } from "./audience.service";
 import { sendToUsers } from "./push.service";
 import Notification from "../models/Notification";
-import { redisConn } from "./redis";
 
-export const campaignQueue = new Queue("notify:campaign", { connection: redisConn });
+const QUEUE_NAME = "notify-campaign"; // <-- بدون :
+const connection = process.env.REDIS_URL
+  ? ({
+      url: process.env.REDIS_URL,
+      tls: process.env.REDIS_TLS === "true" ? {} : undefined,
+    } as any)
+  : ({
+      host: process.env.REDIS_HOST || "127.0.0.1",
+      port: +(process.env.REDIS_PORT || 6379),
+      username: process.env.REDIS_USERNAME || "default",
+      password: process.env.REDIS_PASSWORD,
+      tls: process.env.REDIS_TLS === "true" ? {} : undefined,
+    } as any);
 
-// helper: يولّد RepeatOptions صحيحة حسب نسخة bullmq
-function makeRepeat(cronExpr: string): RepeatOptions {
-  // v4 يستخدم pattern، v3 يستخدم cron
-  return { pattern: cronExpr, tz: "UTC" } as any; // لأن الأنواع تغيّرت بين الإصدارات
-}
+export const campaignQueue = new Queue(QUEUE_NAME, { connection });
+
+// v4+ يستخدم pattern (لو كنت على v3 غيّرها لـ cron)
+const makeRepeat = (expr: string): RepeatOptions =>
+  ({ pattern: expr, tz: "UTC" } as any);
 
 export async function queueCampaign(
   campaignId: string,
@@ -27,9 +38,8 @@ export async function queueCampaign(
   const c = await NotificationCampaign.findById(campaignId).lean();
   if (!c) throw new Error("Campaign not found");
 
-  // مهم: jobId لمنع تكرار نفس الحملة
   const baseOpts: JobsOptions = {
-    jobId: `campaign:${campaignId}`,
+    jobId: `campaign-${campaignId}`,
     removeOnComplete: true,
   };
 
@@ -52,19 +62,17 @@ export async function cancelCampaign(campaignId: string) {
   if (!c) return;
 
   if (c.schedule?.type === "cron" && c.schedule.cron) {
-    // الإلغاء الصحيح لِكرون:
     await campaignQueue.removeRepeatable(
-      campaignId, // name = اسم الوظيفة اللي استخدمناه في add
-      makeRepeat(c.schedule.cron) // نفس repeat options
-    );
+      campaignId,
+      makeRepeat(c.schedule.cron)
+    ); // اسم الجوب = campaignId
   } else {
-    // jobs مؤجلة/فورية: احذفها إن كانت موجودة (حسب jobId)
-    await campaignQueue.remove(`campaign:${campaignId}`).catch(() => {});
+    await campaignQueue.remove(`campaign-${campaignId}`).catch(() => {});
   }
 }
 
 export const campaignWorker = new Worker(
-  "notify:campaign",
+  QUEUE_NAME,
   async (job: Job) => {
     const c = await NotificationCampaign.findById(job.data.campaignId);
     if (!c) return;
@@ -73,15 +81,12 @@ export const campaignWorker = new Worker(
     await c.save();
 
     const users = await buildAudience(c.audience as any);
-    const batches: string[][] = [];
     const size = 500;
-    for (let i = 0; i < users.length; i += size)
-      batches.push(users.slice(i, i + size));
-
     let sent = 0,
       failed = 0;
 
-    for (const group of batches) {
+    for (let i = 0; i < users.length; i += size) {
+      const group = users.slice(i, i + size);
       try {
         const out = await sendToUsers(
           group,
@@ -114,5 +119,5 @@ export const campaignWorker = new Worker(
     };
     await c.save();
   },
-  { connection: redisConn, concurrency: 2 }
+  { connection, concurrency: 2 }
 );
