@@ -5,6 +5,7 @@ import NotificationCampaign from "../../models/NotificationCampaign";
 import NotificationTemplate from "../../models/NotificationTemplate";
 import { buildAudience } from "../../services/audience.service";
 import { cancelCampaign, queueCampaign } from "../../services/campaign.queue";
+import { sendToUsers } from "../../services/push.service";
 
 const r = Router();
 r.use(verifyAdmin);
@@ -40,13 +41,8 @@ r.post("/campaigns/:id/audience-preview", async (req, res) => {
   res.json({ count: users.length, sample: users.slice(0,50) });
 });
 
-// إرسال اختبار إلى مستخدم واحد
-r.post("/test", async (req, res) => {
-  const { userId, title, body, data, channelId } = req.body;
-  const { sendToUsers } = await import("../../services/push.service");
-  const out = await sendToUsers([userId], { title, body, data, channelId: channelId || "orders" }, ["user"]);
-  res.json(out);
-});
+
+
 
 // جدولة/تشغيل حملة
 r.post("/campaigns/:id/send", async (req, res) => {

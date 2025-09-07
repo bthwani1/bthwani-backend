@@ -26,7 +26,7 @@ import topupRoutes from "./routes/Wallet_V8/topupRoutes";
 import driverWithdrawalRoutes from "./routes/driver_app/driver.withdrawal.routes";
 import vendorRoutes from "./routes/vendor_app/vendor.routes";
 import storeStatsRoutes from "./routes/admin/storeStatsRoutes";
-
+import adminNotificationTestRoutes from "./routes/admin/admin.notifications.test";
 import deliveryCategoryRoutes from "./routes/delivry_marketplace_v1/DeliveryCategoryRoutes";
 import deliveryStoreRoutes from "./routes/delivry_marketplace_v1/DeliveryStoreRoutes";
 import deliveryProductRoutes from "./routes/delivry_marketplace_v1/DeliveryProductRoutes";
@@ -214,8 +214,8 @@ app.use(`${API_PREFIX}`, passwordResetRouter);
 app.use(`${API_PREFIX}/favorites`, favoritesRoutes);
 app.use(`${API_PREFIX}/groceries`, groceriesRoutes);
 
-app.use(`${API_PREFIX}/push`, pushRouter);
-
+app.use(`${API_PREFIX}/`, pushRouter);
+app.use(`${API_PREFIX}/`, adminNotificationTestRoutes);
 app.use(`${API_PREFIX}/`, marketerStoreVendorRoutes);
 app.use(`${API_PREFIX}/`, marketerOverviewRoutes);
 app.use(`${API_PREFIX}/`, adminVendorModeration);
