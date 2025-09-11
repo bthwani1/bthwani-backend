@@ -11,14 +11,12 @@ import {
   updateWallet,
   verifyDriver,
 } from "../../controllers/admin/admin.driver.controller";
-import { authenticate, authorize } from "../../middleware/auth.middleware";
 import {
   confirmTransferToUser,
   initiateTransferToUser,
   updateJokerWindow,
 } from "../../controllers/driver_app/driver.controller";
 import { verifyFirebase } from "../../middleware/verifyFirebase";
-import { requireRole } from "../../middleware/auth";
 import {
   approveVacation,
   getActiveDriversCount,
@@ -87,34 +85,34 @@ const router = express.Router();
  */
 router.post(
   "/create",
- verifyFirebase,                   // ← هذا يحلّل الـ JWT ويضع req.user
-verifyAdmin,
+  verifyFirebase, // ← هذا يحلّل الـ JWT ويضع req.user
+  verifyAdmin,
   createDriver
 );
 
 router.put(
   "/joker",
- verifyFirebase,                   // ← هذا يحلّل الـ JWT ويضع req.user
-verifyAdmin,
+  verifyFirebase, // ← هذا يحلّل الـ JWT ويضع req.user
+  verifyAdmin,
   setJokerStatus
 );
 router.patch(
   "vacations/:id/approve",
-  verifyFirebase,                   // ← هذا يحلّل الـ JWT ويضع req.user
-verifyAdmin,
+  verifyFirebase, // ← هذا يحلّل الـ JWT ويضع req.user
+  verifyAdmin,
   approveVacation
 );
 router.get(
   "/active/count",
- verifyFirebase,                   // ← هذا يحلّل الـ JWT ويضع req.user
-verifyAdmin,
+  verifyFirebase, // ← هذا يحلّل الـ JWT ويضع req.user
+  verifyAdmin,
   getActiveDriversCount
 );
 
 router.get(
   "/search",
- verifyFirebase,                   // ← هذا يحلّل الـ JWT ويضع req.user
-verifyAdmin,
+  verifyFirebase, // ← هذا يحلّل الـ JWT ويضع req.user
+  verifyAdmin,
   searchDrivers
 );
 /**
@@ -144,8 +142,8 @@ verifyAdmin,
  */
 router.get(
   "/",
-  verifyFirebase,                   // ← هذا يحلّل الـ JWT ويضع req.user
-verifyAdmin,
+  verifyFirebase, // ← هذا يحلّل الـ JWT ويضع req.user
+  verifyAdmin,
   listDrivers
 );
 /**
@@ -192,8 +190,8 @@ verifyAdmin,
  */
 router.patch(
   "/:id/block",
-  verifyFirebase,                   // ← هذا يحلّل الـ JWT ويضع req.user
-verifyAdmin,
+  verifyFirebase, // ← هذا يحلّل الـ JWT ويضع req.user
+  verifyAdmin,
   toggleBan
 );
 
@@ -233,8 +231,8 @@ verifyAdmin,
  */
 router.patch(
   "/:id/verify",
- verifyFirebase,                   // ← هذا يحلّل الـ JWT ويضع req.user
-verifyAdmin,
+  verifyFirebase, // ← هذا يحلّل الـ JWT ويضع req.user
+  verifyAdmin,
   verifyDriver
 );
 
@@ -288,8 +286,8 @@ verifyAdmin,
  */
 router.patch(
   "/:id/wallet",
- verifyFirebase,                   // ← هذا يحلّل الـ JWT ويضع req.user
-verifyAdmin,
+  verifyFirebase, // ← هذا يحلّل الـ JWT ويضع req.user
+  verifyAdmin,
   updateWallet
 );
 
@@ -336,8 +334,8 @@ verifyAdmin,
  */
 router.patch(
   "/:id/reset-password",
- verifyFirebase,                   // ← هذا يحلّل الـ JWT ويضع req.user
-verifyAdmin,
+  verifyFirebase, // ← هذا يحلّل الـ JWT ويضع req.user
+  verifyAdmin,
   resetPassword
 );
 
@@ -394,7 +392,12 @@ verifyAdmin,
  *       500:
  *         description: خطأ في الخادم أثناء بدء عملية التحويل.
  */
-router.post("/wallet/initiate-transfer", authenticate, initiateTransferToUser);
+router.post(
+  "/wallet/initiate-transfer",
+  verifyFirebase,
+  verifyAdmin,
+  initiateTransferToUser
+);
 
 /**
  * @swagger
@@ -449,11 +452,16 @@ router.post("/wallet/initiate-transfer", authenticate, initiateTransferToUser);
  *       500:
  *         description: خطأ في الخادم أثناء تأكيد عملية التحويل.
  */
-router.post("/wallet/confirm-transfer", authenticate, confirmTransferToUser);
+router.post(
+  "/wallet/confirm-transfer",
+  verifyFirebase,
+  verifyAdmin,
+  confirmTransferToUser
+);
 router.patch(
   "/drivers/:id/joker-window",
- verifyFirebase,                   // ← هذا يحلّل الـ JWT ويضع req.user
-verifyAdmin,
+  verifyFirebase, // ← هذا يحلّل الـ JWT ويضع req.user
+  verifyAdmin,
   updateJokerWindow
 );
 export default router;

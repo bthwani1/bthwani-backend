@@ -1,12 +1,13 @@
 // src/routes/admin/withdrawalAdminRoutes.ts
 
 import express from "express";
-import { authenticate, authorize } from "../../middleware/auth.middleware";
 import {
   listWithdrawals,
   approveWithdrawal,
   rejectWithdrawal,
 } from "../../controllers/admin/admin.withdrawal.controller";
+import { verifyFirebase } from "../../middleware/verifyFirebase";
+import { verifyAdmin } from "../../middleware/verifyAdmin";
 
 const router = express.Router();
 
@@ -42,12 +43,7 @@ const router = express.Router();
  *       500:
  *         description: خطأ في الخادم أثناء جلب طلبات السحب.
  */
-router.get(
-  "/",
-  authenticate,
-  authorize(["admin", "superadmin"]),
-  listWithdrawals
-);
+router.get("/", verifyFirebase, verifyAdmin, listWithdrawals);
 
 /**
  * @swagger
@@ -83,12 +79,7 @@ router.get(
  *       500:
  *         description: خطأ في الخادم أثناء الموافقة على طلب السحب.
  */
-router.patch(
-  "/:id/approve",
-  authenticate,
-  authorize(["admin", "superadmin"]),
-  approveWithdrawal
-);
+router.patch("/:id/approve", verifyFirebase, verifyAdmin, approveWithdrawal);
 
 /**
  * @swagger
@@ -138,11 +129,6 @@ router.patch(
  *       500:
  *         description: خطأ في الخادم أثناء رفض طلب السحب.
  */
-router.patch(
-  "/:id/reject",
-  authenticate,
-  authorize(["admin", "superadmin"]),
-  rejectWithdrawal
-);
+router.patch("/:id/reject", verifyFirebase, verifyAdmin, rejectWithdrawal);
 
 export default router;

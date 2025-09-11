@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { verifyFirebase } from "../../middleware/verifyFirebase";
-import { requireRole } from "../../middleware/auth";
 import * as c from "../../controllers/admin/onboarding.controller";
 
 const r = Router();
@@ -10,7 +9,7 @@ const r = Router();
  *   - name: Admin-Onboarding
  *     description: طابور مراجعة طلبات المتاجر من المسوّقين
  */
-r.use(verifyFirebase, requireRole(["admin", "reviewer", "superadmin"]));
+r.use(verifyFirebase);
 
 r.get("/field/onboarding/queue", c.queue);
 r.get("/field/onboarding/:id", c.getOne);

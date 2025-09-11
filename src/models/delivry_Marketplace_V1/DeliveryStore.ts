@@ -8,7 +8,13 @@ interface IWorkSchedule {
   to?: string;
 }
 
-export type StoreUsageType = "restaurant" | "grocery" | "pharmacy" | "bakery" | "cafe" | "other";
+export type StoreUsageType =
+  | "restaurant"
+  | "grocery"
+  | "pharmacy"
+  | "bakery"
+  | "cafe"
+  | "other";
 
 export interface IDeliveryStore extends Document {
   name: string;
@@ -30,24 +36,33 @@ export interface IDeliveryStore extends Document {
   takeCommission: boolean;
   isTrending: boolean;
   isFeatured: boolean;
+  // ... حقولك السابقة
+  createdByMarketerUid: { type: String; index: true }; // UID من Firebase
+  participants: [
+    {
+      uid: String;
+      role: { type: String; enum: ["lead", "support"]; default: "lead" };
+      weight: { type: Number; default: 0.5 };
+    }
+  ];
 
   // جديد: وسم/تصنيف المتجر + فلاتر
   tags: string[];
 
   // جديد: تقييمات
-  rating?: number;          // متوسط
-  ratingsCount?: number;    // عدد التقييمات
+  rating?: number; // متوسط
+  ratingsCount?: number; // عدد التقييمات
 
   // جديد: تقدير التجهيز والطابور
-  avgPrepTimeMin?: number;  // متوسط تجهيز افتراضي
-  pendingOrders?: number;   // أو queueSize
+  avgPrepTimeMin?: number; // متوسط تجهيز افتراضي
+  pendingOrders?: number; // أو queueSize
 
   // جديد (اختياري): نوع المتجر لتفادي populate
   usageType?: StoreUsageType;
 
   // تتبّع مصدر الإنشاء
-  source: "marketer" | "admin" | "system";
-  createdByUid: string;  // uid من Firebase للمسوّق الذي أنشأ المتجر
+  source: "marketerQuickOnboard" | "admin" | "other";
+  createdByUid: string; // uid من Firebase للمسوّق الذي أنشأ المتجر
   // إعدادات التسعير
   pricingStrategy?: mongoose.Types.ObjectId | null;
   pricingStrategyType: string;
@@ -65,7 +80,11 @@ const storeSchema = new Schema<IDeliveryStore>(
   {
     name: { type: String, required: true },
     address: { type: String, required: true },
-    category: { type: Schema.Types.ObjectId, ref: "DeliveryCategory", required: true },
+    category: {
+      type: Schema.Types.ObjectId,
+      ref: "DeliveryCategory",
+      required: true,
+    },
 
     location: {
       lat: { type: Number, required: true },
@@ -83,9 +102,20 @@ const storeSchema = new Schema<IDeliveryStore>(
 
     isTrending: { type: Boolean, default: false },
     isFeatured: { type: Boolean, default: false },
-  // تتبّع مصدر الإنشاء
-  source: { type: String, enum: ["marketer", "admin", "system"], default: "admin", index: true },
-  createdByUid: { type: String },  // uid من Firebase للمسوّق الذي أنشأ المتجر
+    // تتبّع مصدر الإنشاء
+    createdByMarketerUid: { type: String }, // uid من Firebase للمسوّق الذي أنشأ المتجر
+    participants: [
+      {
+        uid: { type: String, required: true },
+        role: { type: String, enum: ["lead", "support"], default: "lead" },
+        weight: { type: Number, default: 0.5 },
+      },
+    ],
+    source: {
+      type: String,
+      enum: ["marketerQuickOnboard", "admin", "other"],
+      default: "marketerQuickOnboard",
+    },
 
     // فلاتر/وسوم للواجهة (فطور/غداء/عشاء/سريع...)
     tags: { type: [String], default: [] },
@@ -99,10 +129,22 @@ const storeSchema = new Schema<IDeliveryStore>(
     pendingOrders: { type: Number, default: 0 },
 
     // نوع المتجر (بديل عن أخذ usageType من الفئة)
-    usageType: { type: String, enum: ["restaurant","grocery","pharmacy","bakery","cafe","other"], default: "restaurant" },
+    usageType: {
+      type: String,
+      enum: ["restaurant", "grocery", "pharmacy", "bakery", "cafe", "other"],
+      default: "restaurant",
+    },
 
-    pricingStrategy: { type: Schema.Types.ObjectId, ref: "PricingStrategy", default: null },
-    pricingStrategyType: { type: String, enum: ["auto", "manual", ""], default: "" },
+    pricingStrategy: {
+      type: Schema.Types.ObjectId,
+      ref: "PricingStrategy",
+      default: null,
+    },
+    pricingStrategyType: {
+      type: String,
+      enum: ["auto", "manual", ""],
+      default: "",
+    },
 
     // توصيل (اختياري)
     deliveryRadiusKm: { type: Number, default: 0 },
@@ -137,7 +179,10 @@ storeSchema.index({ name: "text", address: "text" });
 // لو استخدمت GeoJSON: حفظ [lng, lat] تلقائيًا من location
 storeSchema.pre("save", function (next) {
   if (this.location?.lng != null && this.location?.lat != null) {
-    this.geo = { type: "Point", coordinates: [this.location.lng, this.location.lat] } as any;
+    this.geo = {
+      type: "Point",
+      coordinates: [this.location.lng, this.location.lat],
+    } as any;
   }
   next();
 });

@@ -4,7 +4,6 @@ import express from "express";
 import * as controller from "../../controllers/delivry_Marketplace_V1/DeliveryProductSubCategoryController";
 import { verifyAdmin } from "../../middleware/verifyAdmin";
 import { verifyFirebase } from "../../middleware/verifyFirebase";
-import { requireRole } from "../../middleware/auth";
 
 const router = express.Router();
 
@@ -60,7 +59,7 @@ const router = express.Router();
  *       500:
  *         description: خطأ في الخادم أثناء إنشاء الفئة الفرعية.
  */
-router.post("/", verifyFirebase,  verifyAdmin, controller.create);
+router.post("/", verifyFirebase, verifyAdmin, controller.create);
 
 /**
  * @swagger
@@ -213,7 +212,7 @@ router.get("/:id", controller.getById);
  *       500:
  *         description: خطأ في الخادم أثناء تعديل الفئة الفرعية.
  */
-router.put("/:id", verifyFirebase,   verifyAdmin, controller.update);
+router.put("/:id", verifyFirebase, verifyAdmin, controller.update);
 
 /**
  * @swagger
@@ -246,8 +245,6 @@ router.put("/:id", verifyFirebase,   verifyAdmin, controller.update);
  *       500:
  *         description: خطأ في الخادم أثناء حذف الفئة الفرعية.
  */
-router.delete("/:id", verifyFirebase,   verifyAdmin, controller.remove);
-
-
+router.delete("/:id", verifyFirebase, verifyAdmin, controller.remove);
 
 export default router;

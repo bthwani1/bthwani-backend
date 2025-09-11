@@ -4,7 +4,6 @@ import express from "express";
 import * as controller from "../../controllers/delivry_Marketplace_V1/DeliveryCategoryController";
 import { verifyAdmin } from "../../middleware/verifyAdmin";
 import { verifyFirebase } from "../../middleware/verifyFirebase";
-import { requireRole } from "../../middleware/auth";
 
 const router = express.Router();
 

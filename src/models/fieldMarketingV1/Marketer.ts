@@ -1,18 +1,34 @@
-import { Schema, model, Document } from "mongoose";
+// src/models/marketing/Marketer.ts
+import mongoose, { Schema, Document } from "mongoose";
+
 export interface IMarketer extends Document {
   fullName: string;
   phone: string;
-  email: string;
-  password: string;           // bcrypt hash
-  city?: string; team?: string; area?: string;
-  status: "active"|"suspended";
+  email?: string;
+  city?: string;
+  team?: string;
+  area?: string;
+  status: "active" | "suspended";
+  password: string; // bcrypt hash
+  createdAt: Date;
+  updatedAt: Date;
 }
-const Sch = new Schema<IMarketer>({
-  fullName: { type: String, required: true },
-  phone:    { type: String, required: true, unique: true, index: true },
-  email:    { type: String, required: true, unique: true, lowercase: true, index: true }, // <—
-  password: { type: String, required: true },                                              // <—
-  city: String, team: String, area: String,
-  status:   { type: String, enum: ["active","suspended"], default: "active" }
-},{ timestamps: true });
-export default model<IMarketer>("Marketer", Sch);
+
+const MarketerSchema = new Schema<IMarketer>(
+  {
+    fullName: { type: String, required: true },
+    phone: { type: String, required: true, unique: true },
+    email: { type: String, unique: true, sparse: true },
+    city: { type: String },
+    team: { type: String },
+    area: { type: String },
+    status: { type: String, enum: ["active", "suspended"], default: "active" },
+    password: { type: String, required: true },
+  },
+  { timestamps: true }
+);
+
+MarketerSchema.index({ phone: 1 }, { unique: true });
+MarketerSchema.index({ email: 1 }, { unique: true, sparse: true });
+
+export default mongoose.model<IMarketer>("Marketer", MarketerSchema);

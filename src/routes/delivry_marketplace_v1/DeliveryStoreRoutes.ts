@@ -3,7 +3,6 @@
 import express from "express";
 import * as controller from "../../controllers/delivry_Marketplace_V1/DeliveryStoreController";
 import { verifyFirebase } from "../../middleware/verifyFirebase";
-import { requireRole } from "../../middleware/auth";
 import { verifyAdmin } from "../../middleware/verifyAdmin";
 
 const router = express.Router();
@@ -184,11 +183,6 @@ router.put("/:id", verifyFirebase, verifyAdmin, controller.update);
  *       500:
  *         description: خطأ في الخادم أثناء حذف المتجر.
  */
-router.delete(
-  "/:id",
-  verifyFirebase,
-  requireRole(["admin", "vendor", "superadmin"]),
-  controller.remove
-);
+router.delete("/:id", verifyFirebase, controller.remove);
 
 export default router;

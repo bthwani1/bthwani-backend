@@ -1,7 +1,6 @@
 import { Router } from "express";
-import { verifyFirebase } from "../../middleware/verifyFirebase";
-import { requireRole } from "../../middleware/auth";
 import * as r from "../../controllers/admin/reports.marketers.controller";
+import { verifyMarketerJWT } from "../../middleware/verifyMarketerJWT";
 
 const x = Router();
 /**
@@ -10,7 +9,7 @@ const x = Router();
  *  - name: Admin-Reports
  *    description: تقارير أداء المسوّقين
  */
-x.use(verifyFirebase, requireRole(["admin", "superadmin", "reviewer"]));
-x.get("/v1/reports/marketers/overview", r.overview);
-x.get("/v1/reports/marketers/:id", r.perMarketer);
+x.use(verifyMarketerJWT);
+x.get("reports/marketers/overview", r.overview);
+x.get("reports/marketers/:id", r.perMarketer);
 export default x;

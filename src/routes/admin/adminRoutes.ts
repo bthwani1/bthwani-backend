@@ -13,7 +13,6 @@ import { verifyFirebase } from "../../middleware/verifyFirebase";
 import { verifyAdmin } from "../../middleware/verifyAdmin";
 import { User } from "../../models/user";
 import { getAdminStats } from "../../controllers/admin/adminUserController";
-import { verifyCapability } from "../../middleware/verifyCapability";
 import { getDeliveryKPIs } from "../../controllers/admin/adminDeliveryController";
 import { listUsersStats } from "../../models/delivry_Marketplace_V1/adminUsers";
 
@@ -217,34 +216,38 @@ router.patch("/users/:id/role", verifyFirebase, verifyAdmin, updateUserRole);
  *       500:
  *         description: خطأ في الخادم أثناء التحقق من الدور.
  */
-router.get("/check-role", verifyFirebase, async (req: Request, res: Response) => {
-  const firebaseUser = (req as any).firebaseUser;          // set by verifyFirebase
-  const uid = firebaseUser?.uid;                            // <-- هذا هو الحقل الصحيح
-  const email = firebaseUser?.email;
+router.get(
+  "/check-role",
+  verifyFirebase,
+  async (req: Request, res: Response) => {
+    const firebaseUser = (req as any).firebaseUser; // set by verifyFirebase
+    const uid = firebaseUser?.uid; // <-- هذا هو الحقل الصحيح
+    const email = firebaseUser?.email;
 
-  if (!uid) {
-    res.status(401).json({ message: "Unauthorized (no uid)" });
-    return;
-  }
-
-  try {
-    // ابحث بالمطابقة على firebaseUID أو البريد كخيار ثانٍ
-    const user = await User.findOne({
-      $or: [{ firebaseUID: uid }, { email }],
-    })
-      .select("role firebaseUID email")
-      .lean();
-
-    if (!user) {
-      res.status(404).json({ message: "User not found" });
+    if (!uid) {
+      res.status(401).json({ message: "Unauthorized (no uid)" });
       return;
     }
 
-    res.json({ role: user.role });
-  } catch (e: any) {
-    res.status(500).json({ message: e.message || "Server error" });
+    try {
+      // ابحث بالمطابقة على firebaseUID أو البريد كخيار ثانٍ
+      const user = await User.findOne({
+        $or: [{ firebaseUID: uid }, { email }],
+      })
+        .select("role firebaseUID email")
+        .lean();
+
+      if (!user) {
+        res.status(404).json({ message: "User not found" });
+        return;
+      }
+
+      res.json({ role: user.role });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "Server error" });
+    }
   }
-});
+);
 
 /**
  * @swagger
@@ -290,20 +293,9 @@ router.get("/check-role", verifyFirebase, async (req: Request, res: Response) =>
  *       500:
  *         description: خطأ في الخادم أثناء جلب الإحصائيات.
  */
-router.get(
-  "/stats",
-  verifyFirebase,
-  verifyAdmin,
-  verifyCapability("admin", "canViewStats"),
-  getAdminStats
-);
+router.get("/stats", verifyFirebase, verifyAdmin, getAdminStats);
 
-router.get(
-  "/delivery/kpis",
-  verifyFirebase,
-  verifyAdmin,
-  getDeliveryKPIs
-);
+router.get("/delivery/kpis", verifyFirebase, verifyAdmin, getDeliveryKPIs);
 /**
  * @swagger
  * /admin/delivery/{id}/status:
@@ -380,12 +372,15 @@ router.get("/delivery/stores/:storeId/stats", async (req, res) => {
 });
 router.get("/users", verifyFirebase, verifyAdmin, listUsersStats);
 router.patch("/users/:id", verifyFirebase, verifyAdmin, updateUserAdmin);
-const getStoreStats = async (storeId: string, period: "daily" | "weekly" | "monthly") => {
+const getStoreStats = async (
+  storeId: string,
+  period: "daily" | "weekly" | "monthly"
+) => {
   // تنفيذ الاستعلام لحساب عدد المنتجات، عدد الطلبات، والإيرادات حسب الفترة المحددة
   // هنا يمكنك استبدال الاستعلام الفعلي بناءً على الهيكل الخاص بك في قاعدة البيانات
   return {
     productsCount: 10, // قيمة افتراضية
-    ordersCount: 5,    // قيمة افتراضية
+    ordersCount: 5, // قيمة افتراضية
     totalRevenue: 100, // قيمة افتراضية
   };
 };

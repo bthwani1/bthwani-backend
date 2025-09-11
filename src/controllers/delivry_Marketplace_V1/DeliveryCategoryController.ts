@@ -44,13 +44,15 @@ export const create = async (req: Request, res: Response) => {
   }
 };
 
-
 // Read all
 // Read all
 export const getAll = async (req: Request, res: Response) => {
   try {
     const { search, usageType, parent, withNumbers } = req.query as {
-      search?: string; usageType?: string; parent?: string; withNumbers?: string;
+      search?: string;
+      usageType?: string;
+      parent?: string;
+      withNumbers?: string;
     };
 
     const filter: any = {};
@@ -60,7 +62,10 @@ export const getAll = async (req: Request, res: Response) => {
     }
     if (search) filter.name = { $regex: search, $options: "i" };
 
-    const data = await DeliveryCategory.find(filter).sort({ sortOrder: 1, name: 1 });
+    const data = await DeliveryCategory.find(filter).sort({
+      sortOrder: 1,
+      name: 1,
+    });
 
     if (withNumbers === "1") {
       const numbered = data.map((doc, idx) => ({
@@ -82,22 +87,20 @@ export const getChildren = async (req: Request, res: Response) => {
     const { parentId } = req.params;
     const { withNumbers } = req.query as { withNumbers?: string };
 
-    const data = await DeliveryCategory
-      .find({ parent: parentId })
-      .sort({ sortOrder: 1, name: 1 });
+    const data = await DeliveryCategory.find({ parent: parentId }).sort({
+      sortOrder: 1,
+      name: 1,
+    });
 
     if (withNumbers === "1") {
-      return res.json(
-        data.map((d, i) => ({ ...d.toObject(), displayIndex: i + 1 }))
-      );
+      res.json(data.map((d, i) => ({ ...d.toObject(), displayIndex: i + 1 })));
+      return;
     }
     res.json(data);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
 };
-
-
 
 // Read by ID
 export const getById = async (req: Request, res: Response) => {
@@ -147,19 +150,23 @@ export const remove = async (req: Request, res: Response) => {
 export const getMainCategories = async (req: Request, res: Response) => {
   try {
     const { search, usageType, withNumbers } = req.query as {
-      search?: string; usageType?: string; withNumbers?: string;
+      search?: string;
+      usageType?: string;
+      withNumbers?: string;
     };
 
     const filter: any = { parent: null };
     if (usageType) filter.usageType = usageType;
     if (search) filter.name = { $regex: search, $options: "i" };
 
-    const data = await DeliveryCategory.find(filter).sort({ sortOrder: 1, name: 1 });
+    const data = await DeliveryCategory.find(filter).sort({
+      sortOrder: 1,
+      name: 1,
+    });
 
     if (withNumbers === "1") {
-      return res.json(
-        data.map((d, i) => ({ ...d.toObject(), displayIndex: i + 1 }))
-      );
+      res.json(data.map((d, i) => ({ ...d.toObject(), displayIndex: i + 1 })));
+      return;
     }
     res.json(data);
   } catch (error: any) {
@@ -179,7 +186,7 @@ export const bulkReorder = async (req: Request, res: Response) => {
       return;
     }
 
-    const ops = items.map(it => ({
+    const ops = items.map((it) => ({
       updateOne: {
         filter: { _id: it._id, usageType, parent: parent ?? null },
         update: { $set: { sortOrder: it.sortOrder } },
@@ -188,9 +195,10 @@ export const bulkReorder = async (req: Request, res: Response) => {
 
     await DeliveryCategory.bulkWrite(ops);
 
-    const data = await DeliveryCategory
-      .find({ usageType, parent: parent ?? null })
-      .sort({ sortOrder: 1, name: 1 });
+    const data = await DeliveryCategory.find({
+      usageType,
+      parent: parent ?? null,
+    }).sort({ sortOrder: 1, name: 1 });
 
     res.json(data);
   } catch (error: any) {
@@ -213,7 +221,10 @@ export const moveUp = async (req: Request, res: Response) => {
       sortOrder: { $lt: current.sortOrder },
     }).sort({ sortOrder: -1 });
 
-    if (!prev) return res.json({ message: "Already at top" });
+    if (!prev) {
+      res.json({ message: "Already at top" });
+      return;
+    }
 
     // swap
     const temp = current.sortOrder;
@@ -243,7 +254,10 @@ export const moveDown = async (req: Request, res: Response) => {
       sortOrder: { $gt: current.sortOrder },
     }).sort({ sortOrder: 1 });
 
-    if (!next) return res.json({ message: "Already at bottom" });
+    if (!next) {
+      res.json({ message: "Already at bottom" });
+      return;
+    }
 
     const temp = current.sortOrder;
     current.sortOrder = next.sortOrder;
