@@ -1,22 +1,57 @@
 import { Request, Response } from "express";
 import { WalletTransaction } from "../../models/Wallet_V8/wallet.model";
 import {
-  verifyCustomerWithKuraimi,
   sendPaymentToKuraimi,
   reverseKuraimiTransaction,
 } from "../../utils/kuraimi";
 import { User } from "../../models/user";
 import mongoose from "mongoose";
 
+// controllers/Wallet_V8/wallet.controller.ts (تعديل getWallet)
 export const getWallet = async (req: Request, res: Response) => {
-  const userId = req.user.id;
+  try {
+    const objId = (req as any).user?.id;
+    const uid =
+      (req as any).user?.firebaseUID || (req as any).firebaseUser?.uid;
 
-  const user = await User.findById(userId, "wallet transactions");
-  if (!user) {
-    res.status(404).json({ error: "User not found" });
+    let user: any = null;
+
+    // ✅ لا تستدع findById إلا لو كان ObjectId صالح
+    if (objId && mongoose.isValidObjectId(objId)) {
+      user = await User.findById(objId).select("wallet").lean();
+    }
+
+    if (!user && uid) {
+      user = await User.findOne({ firebaseUID: uid }).select("wallet").lean();
+    }
+
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    const balance = user.wallet?.balance ?? 0;
+    const onHold = user.wallet?.onHold ?? 0;
+    const available = Math.max(0, balance - onHold);
+    const loyaltyPoints = user.wallet?.loyaltyPoints ?? 0;
+
+    // سجل المعاملات (اختياري)
+    const userIdForTx =
+      objId && mongoose.isValidObjectId(objId) ? objId : undefined;
+
+    const transactions = userIdForTx
+      ? await WalletTransaction.find({ user: userIdForTx })
+          .sort({ createdAt: -1 })
+          .limit(50)
+          .select("description type amount createdAt")
+          .lean()
+      : [];
+
+    res.json({ balance, onHold, available, loyaltyPoints, transactions });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
     return;
   }
-  res.json({ balance: user.wallet.balance, transactions: user.transactions });
 };
 
 export const verifyCustomer = async (req: Request, res: Response) => {
@@ -86,10 +121,15 @@ export const reverseTransaction = async (req: Request, res: Response) => {
   }
 };
 export const getWalletAnalytics = async (req: Request, res: Response) => {
-  const userId = req.user.id;
+  const userId = req.user!.id;
 
   const result = await WalletTransaction.aggregate([
-    { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+    {
+      $match: {
+        userId: new mongoose.Types.ObjectId(userId),
+        method: { $ne: "escrow" },
+      },
+    }, // 👈 استبعد الحجوزات
     {
       $group: {
         _id: {
@@ -106,13 +146,15 @@ export const getWalletAnalytics = async (req: Request, res: Response) => {
 
   res.json(result);
 };
-
 // GET /wallet/analytics/monthly
 export const getMonthlySpending = async (req: Request, res: Response) => {
-  const userId = req.user.id;
+  const userId = req.user!.id;
 
   const user = await User.findById(userId);
-  if (!user) return res.status(404).json({ error: "User not found" });
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
 
   const monthly = Array(12).fill(0);
   const now = new Date();

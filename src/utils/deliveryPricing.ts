@@ -1,6 +1,6 @@
 // src/utils/deliveryPricing.ts
 
-import { IPricingStrategy } from "../models/delivry_Marketplace_V1/PricingStrategy";
+import { IPricingStrategy } from "../models/delivery_marketplace_v1/PricingStrategy";
 
 /**
  * يحسب التكلفة الكاملة بناءً على المسافة وتجزئة الرينجات.
@@ -8,7 +8,10 @@ import { IPricingStrategy } from "../models/delivry_Marketplace_V1/PricingStrate
  * إذا تجاوز المسافات المعرفة، يطبق defaultPricePerKm على الباقي.
  */
 // src/utils/deliveryPricing.ts
-export function calculateDeliveryPrice(distance: number, strategy: IPricingStrategy): number {
+export function calculateDeliveryPrice(
+  distance: number,
+  strategy: IPricingStrategy
+): number {
   // 1. إذا المسافة ضمن الـ baseDistance
   if (distance <= strategy.baseDistance) {
     return strategy.basePrice;
@@ -19,14 +22,16 @@ export function calculateDeliveryPrice(distance: number, strategy: IPricingStrat
   let remaining = distance - strategy.baseDistance;
 
   // 3. رتب الشرائح
-  const sorted = [...strategy.tiers].sort((a, b) => a.minDistance - b.minDistance);
+  const sorted = [...strategy.tiers].sort(
+    (a, b) => a.minDistance - b.minDistance
+  );
 
   // 4. مرّ على الشرائح ولكن بعد الـ baseDistance
   for (const tier of sorted) {
     if (remaining <= 0) break;
     // نحسب الجزء من الـ remaining الذي يقع ضمن هذه الشريحة
-    const start = tier.minDistance - strategy.baseDistance;    // نحوّل إلى بعد الـ baseDistance
-    const end   = tier.maxDistance - strategy.baseDistance;
+    const start = tier.minDistance - strategy.baseDistance; // نحوّل إلى بعد الـ baseDistance
+    const end = tier.maxDistance - strategy.baseDistance;
     if (remaining <= start) continue;
     const inTier = Math.min(remaining, end) - Math.max(0, start);
     cost += inTier * tier.pricePerKm;

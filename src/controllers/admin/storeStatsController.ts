@@ -1,7 +1,7 @@
 // src/controllers/admin/storeStatsController.ts
 import { Types } from "mongoose";
-import Order from "../../models/delivry_Marketplace_V1/Order";
-import DeliveryProduct from "../../models/delivry_Marketplace_V1/DeliveryProduct";
+import Order from "../../models/delivery_marketplace_v1/Order";
+import DeliveryProduct from "../../models/delivery_marketplace_v1/DeliveryProduct";
 
 /**
  * period: "daily" | "weekly" | "monthly"
@@ -34,8 +34,7 @@ export async function getStoreStats(
 
   // 1. عدد المنتجات في الكاتالوج الخاص بالمتجر
   const productsCount = await DeliveryProduct.countDocuments({
-    store: new Types.ObjectId(storeId)
-,
+    store: new Types.ObjectId(storeId),
   });
 
   // 2. عدد الطلبات والإيرادات عبر التجميع

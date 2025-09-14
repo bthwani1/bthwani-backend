@@ -3,8 +3,8 @@ import PushToken from "../models/PushToken";
 import { User } from "../models/user";
 import Driver from "../models/Driver_app/driver";
 import Vendor from "../models/vendor_app/Vendor";
-import DeliveryStore from "../models/delivry_Marketplace_V1/DeliveryStore";
-import DeliveryOrder from "../models/delivry_Marketplace_V1/Order";
+import DeliveryStore from "../models/delivery_marketplace_v1/DeliveryStore";
+import DeliveryOrder from "../models/delivery_marketplace_v1/Order";
 
 type Audience = {
   apps?: ("user" | "driver" | "vendor")[];

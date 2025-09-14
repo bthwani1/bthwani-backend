@@ -1,5 +1,8 @@
 import { Request, Response } from "express";
 import { User } from "../../models/user";
+import { adminAuth } from "../../config/firebaseAdmin";
+import Order from "../../models/delivery_marketplace_v1/Order";
+import mongoose from "mongoose";
 function isValidGeoPoint(p: any) {
   return (
     p &&
@@ -10,6 +13,20 @@ function isValidGeoPoint(p: any) {
     typeof p.coordinates[1] === "number"
   );
 }
+function anonymizeUserDoc(u: any) {
+  const ts = Date.now();
+  u.fullName = "Deleted User";
+  if (u.email) u.email = `deleted+${ts}@deleted.local`; // ضمان عدم التعارض (unique)
+  u.phone = undefined;
+  u.profileImage = undefined;
+  u.aliasName = undefined;
+  u.addresses = []; // أو امسح PII من داخلها بدل التفريغ
+  (u as any).defaultAddressId = undefined;
+  u.isActive = false;
+  (u as any).isDeleted = true; // تأكد من وجود الحقل في الـ Schema (boolean افتراضي false)
+  (u as any).metadata = { ...(u.metadata || {}), deletedAt: new Date() };
+}
+
 export const registerOrUpdateUser = async (req: Request, res: Response) => {
   const fb: any = (req as any).firebaseUser || (req as any).user;
   if (!fb?.uid) {
@@ -33,7 +50,22 @@ export const registerOrUpdateUser = async (req: Request, res: Response) => {
   try {
     // 1) ابحث بالـ firebaseUID
     let user = await User.findOne({ firebaseUID: uid });
-
+    if (user) {
+      if (!user.firebaseUID) {
+        user.firebaseUID = uid; // ربط أول مرة
+      } else if (user.firebaseUID !== uid) {
+        // 🔁 إعادة ربط آمنة لأننا نثق بتوكن Firebase لهذا البريد
+        user.firebaseUID = uid;
+      }
+    } else {
+      // إنشاء سجل جديد
+      user = new User({
+        fullName,
+        email,
+        firebaseUID: uid,
+        ...body,
+      });
+    }
     // 2) إن لم يوجد، ابحث بالإيميل
     if (!user && email) {
       user = await User.findOne({ email: email });
@@ -43,10 +75,11 @@ export const registerOrUpdateUser = async (req: Request, res: Response) => {
           user.firebaseUID = uid;
         } else if (user.firebaseUID !== uid) {
           // هذا البريد مربوط بحساب Firebase آخر
-           res
-            .status(409)
-            .json({ message: "هذا البريد مرتبط بحساب آخر. سجّل الدخول.", code: "EMAIL_LINK_CONFLICT" });
-            return;
+          res.status(409).json({
+            message: "هذا البريد مرتبط بحساب آخر. سجّل الدخول.",
+            code: "EMAIL_LINK_CONFLICT",
+          });
+          return;
         }
       }
     }
@@ -59,13 +92,16 @@ export const registerOrUpdateUser = async (req: Request, res: Response) => {
         firebaseUID: uid,
         ...body,
       });
-    } else {  
+    } else {
       // ⚠️ لا نستبدل الاسم الموجود إلا إذا كان فارغًا/افتراضيًا
-      if (fullName && fullName !== "مستخدم" &&
-          (!user.fullName || user.fullName === "مستخدم")) {
+      if (
+        fullName &&
+        fullName !== "مستخدم" &&
+        (!user.fullName || user.fullName === "مستخدم")
+      ) {
         user.fullName = fullName;
       }
-  
+
       // مثال آمن للهاتف: لا تسقط الموجود بقيمة افتراضية
       if (typeof body.phone !== "undefined" && !user.phone) {
         user.phone = body.phone;
@@ -79,8 +115,8 @@ export const registerOrUpdateUser = async (req: Request, res: Response) => {
     }
 
     const saved = await user.save();
-     res.status(200).json(saved);
-     return;
+    res.status(200).json(saved);
+    return;
   } catch (err: any) {
     // معالجة تكرار الإيميل كتعامل منطقي وليس 500
     if (err?.code === 11000 && err?.keyPattern?.email) {
@@ -90,37 +126,173 @@ export const registerOrUpdateUser = async (req: Request, res: Response) => {
         if (!existing.firebaseUID || existing.firebaseUID === uid) {
           existing.firebaseUID = uid;
           if (fullName) existing.fullName = fullName;
-          if (typeof (body as any).phone !== "undefined") existing.phone = (body as any).phone;
+          if (typeof (body as any).phone !== "undefined")
+            existing.phone = (body as any).phone;
           if (isValidGeoPoint((body as any).donationLocation)) {
             (existing as any).donationLocation = (body as any).donationLocation;
           }
           const saved = await existing.save();
-           res.status(200).json(saved);
-           return;
-        }
-         res
-          .status(409)
-          .json({ message: "هذا البريد مستخدم من حساب آخر.", code: "EMAIL_TAKEN" });
+          res.status(200).json(saved);
           return;
+        }
+        res.status(409).json({
+          message: "هذا البريد مستخدم من حساب آخر.",
+          code: "EMAIL_TAKEN",
+        });
+        return;
       }
     }
 
     console.error("❌ Error saving user:", err);
-     res.status(500).json({ message: "Error saving user", error: err?.message });
-     return;
+    res.status(500).json({ message: "Error saving user", error: err?.message });
+    return;
   }
 };
+export const getDeleteEligibility = async (req: Request, res: Response) => {
+  try {
+    const fbUid = req.user?.uid;
+    if (!fbUid) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const user: any = await User.findOne({ firebaseUID: fbUid })
+      .select("wallet")
+      .lean();
+
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    const hasBalance = (user.wallet?.balance || 0) > 0;
+
+    // الحالات التي تعتبر "نشِطة" وتمنع الحذف — عدّلها لما يناسب نظامك
+    const ACTIVE_STATUSES = ["pending", "accepted", "assigned", "in_progress"];
+    const blockingOrder = await Order.findOne({
+      user: (user as any)._id,
+      status: { $in: ACTIVE_STATUSES },
+    })
+      .select("_id status")
+      .lean();
+
+    const reasons: string[] = [];
+    if (hasBalance) reasons.push("يوجد رصيد في المحفظة. اسحب رصيدك أولًا.");
+    if (blockingOrder)
+      reasons.push(
+        `يوجد طلب قيد المعالجة (#${blockingOrder._id}). ألغِ الطلب أولًا.`
+      );
+
+    res.json({ canDelete: reasons.length === 0, reasons });
+    return;
+  } catch (e) {
+    res.status(500).json({ message: "Failed to check eligibility" });
+    return;
+  }
+};
+export const deleteMyAccount = async (req: Request, res: Response) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const fbUid = req.user?.uid;
+    if (!fbUid) {
+      await session.abortTransaction();
+      {
+        res.status(401).json({ message: "Unauthorized" });
+
+        return;
+      }
+    }
+
+    const user: any = await User.findOne({ firebaseUID: fbUid }).session(
+      session
+    );
+    if (!user) {
+      await session.abortTransaction();
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    // منع الحذف في حال الرصيد/الطلبات الفعالة
+    const hasBalance = (user.wallet?.balance || 0) > 0;
+    const ACTIVE_STATUSES = ["pending", "accepted", "assigned", "in_progress"];
+    const blockingOrder = await Order.findOne({
+      user: user._id,
+      status: { $in: ACTIVE_STATUSES },
+    }).session(session);
+
+    if (hasBalance || blockingOrder) {
+      await session.abortTransaction();
+      res.status(409).json({
+        message: "لا يمكن الحذف.",
+        reasons: [
+          ...(hasBalance ? ["يوجد رصيد في المحفظة."] : []),
+          ...(blockingOrder
+            ? [`يوجد طلب قيد المعالجة (#${blockingOrder._id}).`]
+            : []),
+        ],
+      });
+      return;
+    }
+
+    // إزالة البيانات الشخصية + وسم محذوف
+    anonymizeUserDoc(user);
+    await user.save({ session });
+
+    // حذف رموز الإشعارات المرتبطة (إن وُجد موديل)
+    try {
+      const NotificationToken = mongoose.model("NotificationToken");
+      await NotificationToken.deleteMany({ userId: user._id }).session(session);
+    } catch {}
+
+    // تعليم الطلبات المغلقة بأنها تخص مستخدمًا محذوفًا (اختياري)
+    try {
+      await Order.updateMany(
+        { user: user._id, status: { $in: ["completed", "cancelled"] } },
+        { $set: { userDeleted: true } },
+        { session }
+      );
+    } catch {}
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // بعد نجاح DB: إبطال وحذف مستخدم Firebase (اختياري)
+    try {
+      if (adminAuth && user.firebaseUID) {
+        await adminAuth.revokeRefreshTokens(user.firebaseUID);
+        await adminAuth.deleteUser(user.firebaseUID);
+      }
+    } catch {}
+
+    res.json({ ok: true });
+    return;
+  } catch (e) {
+    try {
+      await session.abortTransaction();
+    } catch {}
+    session.endSession();
+    res.status(500).json({ message: "Failed to delete account" });
+    return;
+  }
+};
+
 export const searchUsers = async (req: Request, res: Response) => {
   const q = (req.query.q as string) || "";
   const limit = Math.min(parseInt((req.query.limit as string) || "20"), 50);
   const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
   const users = await User.find({
-    $or: [{ fullName: regex }, { name: regex }, { phone: { $regex: q, $options: "i" } }],
+    $or: [
+      { fullName: regex },
+      { name: regex },
+      { phone: { $regex: q, $options: "i" } },
+    ],
   })
     .select("_id fullName name phone")
     .limit(limit)
     .lean();
   res.json(users);
+  return;
 };
 export const getCurrentUser = async (req: Request, res: Response) => {
   try {
@@ -232,7 +404,10 @@ export const getLoginHistory = async (req: Request, res: Response) => {
   }
 
   const user = await User.findOne({ firebaseUID: req.user.uid });
-  if (!user) return res.status(404).json({ message: "User not found" });
+  if (!user) {
+    res.status(404).json({ message: "User not found" });
+    return;
+  }
   res.json(user.loginHistory || []);
 };
 
@@ -319,7 +494,7 @@ export const deactivateAccount = async (req: Request, res: Response) => {
 
 export const getAddresses = async (req: Request, res: Response) => {
   try {
-    const firebaseUID = req.user?.id;
+    const firebaseUID = req.user?.uid; // ✅
     if (!firebaseUID) {
       res.status(401).json({ message: "Unauthorized" });
       return;

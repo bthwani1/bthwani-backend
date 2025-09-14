@@ -2,10 +2,10 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
-import DeliveryStore from "../../models/delivry_Marketplace_V1/DeliveryStore";
+import DeliveryStore from "../../models/delivery_marketplace_v1/DeliveryStore";
 import Vendor from "../../models/vendor_app/Vendor";
 
-import DeliveryCategory from "../../models/delivry_Marketplace_V1/DeliveryCategory"; // تأكد من وجود هذا الموديل
+import DeliveryCategory from "../../models/delivery_marketplace_v1/DeliveryCategory"; // تأكد من وجود هذا الموديل
 
 export const quickOnboard = async (req: Request, res: Response) => {
   const session = await mongoose.startSession();

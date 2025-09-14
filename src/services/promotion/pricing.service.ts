@@ -1,7 +1,7 @@
 // services/promotion/pricing.service.ts
 import Promotion, {
   IPromotion,
-} from "../../models/delivry_Marketplace_V1/Promotion";
+} from "../../models/delivery_marketplace_v1/Promotion";
 import { FilterQuery } from "mongoose";
 
 type ValueType = "percentage" | "fixed";

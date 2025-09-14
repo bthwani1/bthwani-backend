@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import Onboarding from "../../models/fieldMarketingV1/Onboarding";
-import DeliveryStore from "../../models/delivry_Marketplace_V1/DeliveryStore";
+import DeliveryStore from "../../models/delivery_marketplace_v1/DeliveryStore";
 import Vendor from "../../models/vendor_app/Vendor";
 import bcrypt from "bcryptjs";
 
@@ -14,7 +14,7 @@ export async function queue(req: Request, res: Response) {
 }
 
 export async function getOne(req: Request, res: Response) {
-  if (!mongoose.isValidObjectId(req.params.id)){
+  if (!mongoose.isValidObjectId(req.params.id)) {
     res.status(400).json({ message: "id غير صالح" });
     return;
   }
@@ -66,7 +66,7 @@ export async function reject(req: Request, res: Response) {
 
 export async function approve(req: Request, res: Response) {
   const onb = await Onboarding.findById(req.params.id);
-    if (!onb) {
+  if (!onb) {
     res.status(404).json({ message: "غير موجود" });
     return;
   }

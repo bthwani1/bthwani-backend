@@ -145,10 +145,13 @@ router.post("/coupons/use", verifyFirebase, markCouponAsUsed);
  *         description: لم يتم تقديم توكين صالح أو منتهي الصلاحية.
  */
 router.get("/coupons/user", verifyFirebase, async (req, res) => {
+  const userId = req.user!.id;
   const coupons = await Coupon.find({
-    $or: [{ assignedTo: req.user.id }, { assignedTo: null }],
-    expiryDate: { $gte: new Date() },
-    usedCount: { $lt: "$usageLimit" },
+    $and: [
+      { expiryDate: { $gte: new Date() } },
+      { $or: [{ assignedTo: userId }, { assignedTo: null }] },
+      { $expr: { $lt: ["$usedCount", { $ifNull: ["$usageLimit", 1] }] } }, // 👈 بدل usedCount: {$lt: "$usageLimit"}
+    ],
   });
   res.json(coupons);
 });

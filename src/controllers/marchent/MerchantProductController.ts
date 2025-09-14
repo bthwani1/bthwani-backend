@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import MerchantProduct from "../../models/mckathi/MerchantProduct";
 import ProductCatalog from "../../models/mckathi/ProductCatalog";
-import StoreSection from "../../models/delivry_Marketplace_V1/StoreSection";
+import StoreSection from "../../models/delivery_marketplace_v1/StoreSection";
 import {
   applyPromotionToProduct,
   fetchActivePromotions,

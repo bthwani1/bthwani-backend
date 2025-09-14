@@ -14,7 +14,11 @@ export interface CouponType extends Document {
 
 const CouponSchema = new Schema<CouponType>({
   code: { type: String, required: true, unique: true },
-  type: { type: String, enum: ["percentage", "fixed", "free_shipping"], required: true },
+  type: {
+    type: String,
+    enum: ["percentage", "fixed", "free_shipping"],
+    required: true,
+  },
   value: { type: Number, required: true },
   expiryDate: { type: Date, required: true },
   isUsed: { type: Boolean, default: false },
@@ -25,3 +29,5 @@ const CouponSchema = new Schema<CouponType>({
 });
 
 export const Coupon: Model<CouponType> = mongoose.model("Coupon", CouponSchema);
+CouponSchema.index({ code: 1 }, { unique: true });
+CouponSchema.index({ assignedTo: 1, expiryDate: 1 });

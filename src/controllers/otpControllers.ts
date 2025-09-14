@@ -21,6 +21,7 @@ export const sendEmailOTP = async (
   return code;
 };
 
+// controllers/otpControllers.ts (تحسين verifyOTP)
 export const verifyOTP = async ({
   userId,
   email,
@@ -38,32 +39,23 @@ export const verifyOTP = async ({
     used: false,
     expiresAt: { $gt: new Date() },
   };
+  if (userId) query.userId = new Types.ObjectId(userId);
+  else if (email) query["metadata.email"] = (email || "").trim().toLowerCase();
 
-  if (userId) query.userId = new Types.ObjectId(userId); // 👈 هذا هو الصح
-  else if (email) query["metadata.email"] = email;
+  const otp = await OTP.findOne(query);
+  if (!otp) return { valid: false };
 
-  console.log("🔍 التحقق من OTP:", query);
-
-let otp;
-try {
-  otp = await OTP.findOne(query);
-  console.log("🔍 نتائج البحث:", otp);
-} catch (err) {
-  console.error("❌ خطأ أثناء البحث في OTP:", err);
-  throw new Error("فشل التحقق من قاعدة البيانات");
-}
-  if (!otp) {
-    return { valid: false };
-  }
-
+  // ✅ حدّث بالمؤكد (userId) ثم إحتماليًا بالإيميل إن وُجد
+  await User.updateOne({ _id: otp.userId }, { $set: { emailVerified: true } });
   if (otp.metadata?.email) {
     await User.updateOne(
       { email: otp.metadata.email },
-      { emailVerified: true }
+      { $set: { emailVerified: true } }
     );
   }
 
   otp.used = true;
+
   await otp.save();
 
   return { valid: true };

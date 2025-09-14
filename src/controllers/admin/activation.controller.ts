@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import DeliveryStore from "../../models/delivry_Marketplace_V1/DeliveryStore";
+import DeliveryStore from "../../models/delivery_marketplace_v1/DeliveryStore";
 import Vendor from "../../models/vendor_app/Vendor";
 
 export const activateStore = async (req: Request, res: Response) => {

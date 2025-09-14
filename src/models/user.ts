@@ -6,13 +6,17 @@ export interface EmailVerification {
   channel: VerificationChannel;
   attempts: number;
 }
-type VerificationChannel = 'email' | 'sms' | 'whatsapp';
+type VerificationChannel = "email" | "sms" | "whatsapp";
 
 const EmailVerificationSchema = new Schema<EmailVerification>(
   {
     codeHash: { type: String, required: true },
     expiresAt: { type: Date, required: true },
-    channel: { type: String, enum: ['email', 'sms', 'whatsapp'], required: true },
+    channel: {
+      type: String,
+      enum: ["email", "sms", "whatsapp"],
+      required: true,
+    },
     attempts: { type: Number, default: 0 },
   },
   { _id: false }
@@ -32,18 +36,17 @@ const AddressSchema = new mongoose.Schema({
 // 💰 محفظة المستخدم
 const WalletSchema = new mongoose.Schema(
   {
-    balance: { type: Number, default: 0 },
+    balance: { type: Number, default: 0 }, // خزّنها أعداد صحيحة (ريال)
+    onHold: { type: Number, default: 0 }, // 👈 جديد: مبالغ محجوزة
     currency: { type: String, default: "YER" },
     totalSpent: { type: Number, default: 0 },
     totalEarned: { type: Number, default: 0 },
-    loyaltyPoints: { type: Number, default: 0 }, // ✅
-    savings: { type: Number, default: 0 }, // ✅ الجديد
-
+    loyaltyPoints: { type: Number, default: 0 },
+    savings: { type: Number, default: 0 },
     lastUpdated: { type: Date, default: Date.now },
   },
   { _id: false }
 );
-
 // 🔐 إعدادات الأمان
 const SecuritySchema = new mongoose.Schema(
   {
@@ -92,10 +95,10 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, unique: true },
   phone: { type: String },
   profileImage: { type: String, default: "" },
-emailVerified: { type: Boolean, default: false },
+  emailVerified: { type: Boolean, default: false },
   classification: {
     type: String,
-    enum: ["regular","bronze","silver","gold","vip"],
+    enum: ["regular", "bronze", "silver", "gold", "vip"],
     default: "regular",
   },
   negativeRatingCount: {
@@ -109,10 +112,10 @@ emailVerified: { type: Boolean, default: false },
   },
 
   addresses: [AddressSchema],
-defaultAddressId: {
-  type: mongoose.Schema.Types.ObjectId,
-  required: false,
-},
+  defaultAddressId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: false,
+  },
   isVerified: { type: Boolean, default: false },
   isBanned: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
@@ -123,7 +126,6 @@ defaultAddressId: {
     default: "firebase",
   },
   firebaseUID: String,
-
 
   loginHistory: [
     {
@@ -143,9 +145,6 @@ defaultAddressId: {
   ],
 
   favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
- 
-
-
 
   // Settings
   language: { type: String, enum: ["ar", "en"], default: "ar" },
@@ -159,8 +158,6 @@ defaultAddressId: {
   isBlacklisted: { type: Boolean, default: false },
 
   pushToken: { type: String },
-
- 
 
   // 💰 Wallet
   wallet: WalletSchema,

@@ -1,6 +1,6 @@
 // src/controllers/field/onboardingMy.controller.ts
 import { Request, Response } from "express";
-import DeliveryStore from "../../models/delivry_Marketplace_V1/DeliveryStore";
+import DeliveryStore from "../../models/delivery_marketplace_v1/DeliveryStore";
 import Vendor from "../../models/vendor_app/Vendor";
 
 export const getMyOnboarding = async (req: Request, res: Response) => {

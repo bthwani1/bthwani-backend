@@ -14,7 +14,7 @@ import { verifyAdmin } from "../../middleware/verifyAdmin";
 import { User } from "../../models/user";
 import { getAdminStats } from "../../controllers/admin/adminUserController";
 import { getDeliveryKPIs } from "../../controllers/admin/adminDeliveryController";
-import { listUsersStats } from "../../models/delivry_Marketplace_V1/adminUsers";
+import { listUsersStats } from "../../models/delivery_marketplace_v1/adminUsers";
 
 const router = Router();
 

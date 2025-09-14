@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import Driver from "../models/Driver_app/driver";
-import DeliveryStore from "../models/delivry_Marketplace_V1/DeliveryStore";
-import DeliveryOrder from "../models/delivry_Marketplace_V1/Order";
+import DeliveryStore from "../models/delivery_marketplace_v1/DeliveryStore";
+import DeliveryOrder from "../models/delivery_marketplace_v1/Order";
 import DispatchOffer from "../models/dispatchOffer";
 import { io } from ".."; // عدّل المسار حسب مشروعك
 
@@ -19,7 +19,12 @@ function jokerWindowMatch() {
   };
 }
 
-export async function getNearestAvailableDrivers(lng: number, lat: number, limit = 5, exclude: string[] = []) {
+export async function getNearestAvailableDrivers(
+  lng: number,
+  lat: number,
+  limit = 5,
+  exclude: string[] = []
+) {
   const q: any = {
     isAvailable: true,
     isBanned: false,
@@ -31,8 +36,12 @@ export async function getNearestAvailableDrivers(lng: number, lat: number, limit
       },
     },
   };
-  if (exclude.length) q._id = { $nin: exclude.map((id) => new mongoose.Types.ObjectId(id)) };
-  return Driver.find(q).select("_id fullName phone driverType").limit(limit).lean();
+  if (exclude.length)
+    q._id = { $nin: exclude.map((id) => new mongoose.Types.ObjectId(id)) };
+  return Driver.find(q)
+    .select("_id fullName phone driverType")
+    .limit(limit)
+    .lean();
 }
 
 /** بث عروض لسائقي unified (على مستوى order) */
@@ -43,7 +52,11 @@ export async function broadcastUnified(order: any, offerTTLmin = 2) {
   const store = await DeliveryStore.findById(storeId).lean();
   if (!store?.location) return { sent: 0 };
 
-  const drivers = await getNearestAvailableDrivers(store.location.lng, store.location.lat, 5);
+  const drivers = await getNearestAvailableDrivers(
+    store.location.lng,
+    store.location.lat,
+    5
+  );
   let sent = 0;
   for (const d of drivers) {
     try {
@@ -75,7 +88,11 @@ export async function broadcastSplit(order: any, offerTTLmin = 2) {
     const store = await DeliveryStore.findById(sub.store).lean();
     if (!store?.location) continue;
 
-    const drivers = await getNearestAvailableDrivers(store.location.lng, store.location.lat, 5);
+    const drivers = await getNearestAvailableDrivers(
+      store.location.lng,
+      store.location.lat,
+      5
+    );
     for (const d of drivers) {
       try {
         await DispatchOffer.create({
@@ -98,7 +115,10 @@ export async function broadcastSplit(order: any, offerTTLmin = 2) {
 }
 
 /** نقطة دخول عامة */
-export async function broadcastOffersForOrder(orderId: string, offerTTLmin = 2) {
+export async function broadcastOffersForOrder(
+  orderId: string,
+  offerTTLmin = 2
+) {
   const order = await DeliveryOrder.findById(orderId).lean();
   if (!order) return { sent: 0 };
 

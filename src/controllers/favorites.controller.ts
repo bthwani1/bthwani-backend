@@ -2,8 +2,8 @@ import { Request, Response } from "express";
 import { Types } from "mongoose";
 import Favorite, { FavoriteType } from "../models/Favorite";
 import { User } from "../models/user";
-import DeliveryStore from "../models/delivry_Marketplace_V1/DeliveryStore";
-import DeliveryProduct from "../models/delivry_Marketplace_V1/DeliveryProduct";
+import DeliveryStore from "../models/delivery_marketplace_v1/DeliveryStore";
+import DeliveryProduct from "../models/delivery_marketplace_v1/DeliveryProduct";
 
 // ------ Helpers ------
 const isValidObjectId = (v: any) =>

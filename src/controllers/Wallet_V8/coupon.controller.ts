@@ -26,7 +26,8 @@ export const createCoupon = async (req: Request, res: Response) => {
 
 // ✅ التحقق من كوبون
 export const validateCoupon = async (req: Request, res: Response) => {
-  const { code, userId } = req.body;
+  const { code } = req.body;
+  const currentUserId = req.user!.id; // 👈 من التوكين
 
   const coupon = await Coupon.findOne({ code });
   if (!coupon) {
@@ -37,11 +38,10 @@ export const validateCoupon = async (req: Request, res: Response) => {
     res.status(400).json({ error: "انتهت صلاحية الكوبون" });
     return;
   }
-  if (coupon.assignedTo && String(coupon.assignedTo) !== userId) {
+  if (coupon.assignedTo && String(coupon.assignedTo) !== currentUserId) {
     res.status(403).json({ error: "غير مخصص لك" });
     return;
   }
-
   if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
     res.status(400).json({ error: "تم استخدام الكوبون بالكامل" });
     return;
@@ -53,10 +53,15 @@ export const validateCoupon = async (req: Request, res: Response) => {
 // ✔️ تسجيل استخدام الكوبون
 export const markCouponAsUsed = async (req: Request, res: Response) => {
   const { code } = req.body;
+  const currentUserId = req.user!.id; // 👈 من التوكين
   const coupon = await Coupon.findOne({ code });
   if (!coupon) {
     res.status(404).json({ error: "الكوبون غير موجود" });
 
+    return;
+  }
+  if (coupon.assignedTo && String(coupon.assignedTo) !== currentUserId) {
+    res.status(403).json({ error: "غير مخصص لك" });
     return;
   }
   coupon.usedCount += 1;
@@ -69,7 +74,7 @@ export const markCouponAsUsed = async (req: Request, res: Response) => {
 };
 
 export const redeemPoints = async (req: Request, res: Response) => {
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(req.user!.id);
   const REQUIRED_POINTS = 100;
   const COUPON_VALUE = 100;
 

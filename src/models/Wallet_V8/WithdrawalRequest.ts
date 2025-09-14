@@ -15,7 +15,11 @@ interface WithdrawalRequestType extends Document {
 const WithdrawalRequestSchema = new Schema<WithdrawalRequestType>({
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
   amount: { type: Number, required: true },
-  status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+  status: {
+    type: String,
+    enum: ["pending", "approved", "rejected"],
+    default: "pending",
+  },
   fee: { type: Number, default: 0 },
   requestedAt: { type: Date, default: Date.now },
   processedAt: Date,
@@ -24,4 +28,8 @@ const WithdrawalRequestSchema = new Schema<WithdrawalRequestType>({
   accountInfo: String,
 });
 
-export const WithdrawalRequest: Model<WithdrawalRequestType> = mongoose.model("WithdrawalRequest", WithdrawalRequestSchema);
+export const WithdrawalRequest: Model<WithdrawalRequestType> = mongoose.model(
+  "WithdrawalRequest",
+  WithdrawalRequestSchema
+);
+WithdrawalRequestSchema.index({ userId: 1, requestedAt: -1 });

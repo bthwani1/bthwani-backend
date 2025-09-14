@@ -1,7 +1,6 @@
 // src/routes/userRoutes.ts
 
-import { Router, Request, Response } from "express";
-import * as crypto from "crypto";
+import { Router } from "express";
 import { verifyFirebase } from "../middleware/verifyFirebase";
 import {
   registerOrUpdateUser,
@@ -14,6 +13,8 @@ import {
   deactivateAccount,
   getAddresses,
   searchUsers,
+  deleteMyAccount,
+  getDeleteEligibility,
 } from "../controllers/user/userController";
 import {
   addAddress,
@@ -70,10 +71,23 @@ const router = Router();
  *       401:
  *         description: لم يتم تقديم توكين صالح أو انتهت صلاحيته.
  */
-router.get("/me", verifyFirebase, getCurrentUser);
+router.get(
+  "/me",
+  (req, res, next) => {
+    console.log("[/users/me] before verify");
+    next();
+  },
+  verifyFirebase,
+  (req, res, next) => {
+    console.log("[/users/me] after verify");
+    next();
+  },
+
+  getCurrentUser
+);
 router.get(
   "/search",
- verifyFirebase,                   // ← هذا يحلّل الـ JWT ويضع req.user
+  verifyFirebase, // ← هذا يحلّل الـ JWT ويضع req.user
   searchUsers
 );
 /**
@@ -105,8 +119,6 @@ router.get(
  *         description: التوكين مفقود أو غير صالح.
  */
 router.post("/init", verifyFirebase, registerOrUpdateUser);
-
-
 
 /**
  * @swagger
@@ -290,6 +302,34 @@ router.get("/me/stats", verifyFirebase, getUserStats);
  *         description: توكين غير صالح أو مفقود.
  */
 router.delete("/me/deactivate", verifyFirebase, deactivateAccount);
+
+/**
+ * @swagger
+ * /users/me/delete-eligibility:
+ *   get:
+ *     summary: التحقق من إمكانية حذف الحساب
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: حالة الإتاحة وأسباب المنع (إن وجدت).
+ */
+router.get("/me/delete-eligibility", verifyFirebase, getDeleteEligibility);
+
+/**
+ * @swagger
+ * /users/me:
+ *   delete:
+ *     summary: حذف الحساب نهائيًا (إزالة البيانات الشخصية)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: تم حذف الحساب (أنونيمز/وسم محذوف).
+ */
+router.delete("/me", verifyFirebase, deleteMyAccount);
 
 /**
  * @swagger
@@ -540,7 +580,6 @@ router.post("/wallet/transfer", verifyFirebase, transferFunds);
  */
 router.get("/wallet/transfer-history", verifyFirebase, getTransferHistory);
 
-
 /**
  * @swagger
  * /users/notifications:
@@ -634,7 +673,6 @@ router.patch(
  */
 router.patch("/avatar", verifyFirebase, uploadAvatar);
 
-
 router.post("/otp/send", verifyFirebase, async (req, res) => {
   try {
     const fb = (req as any).firebaseUser;
@@ -656,7 +694,7 @@ router.post("/otp/send", verifyFirebase, async (req, res) => {
     const code = await sendEmailOTP(email, String(user._id), "verifyEmail");
 
     // وضع التطوير: أطبع الكود بدل الاعتماد على SMTP
-    const ch =  "smtp";
+    const ch = "smtp";
     if (ch !== "smtp") {
       console.log(`📧 DEV OTP to ${email}: ${code}`);
       res.json({ ok: true, dev: true });
@@ -664,7 +702,6 @@ router.post("/otp/send", verifyFirebase, async (req, res) => {
     }
     res.json({ ok: true });
     return;
-
   } catch (err: any) {
     console.error("❌ /users/otp/send failed:", err?.message || err);
     res.status(500).json({ message: "فشل الإرسال", error: err?.message });
@@ -698,15 +735,18 @@ router.post("/otp/verify", verifyFirebase, async (req, res) => {
     });
 
     if (!result.valid) {
-      res.status(400).json({ message: "رمز غير صحيح أو منتهي" });
+      res
+        .status(400)
+        .json({ code: "BAD_OTP", message: "رمز غير صحيح أو منتهي" });
       return;
     }
 
-    res.json({ ok: true });
+    res.json({ ok: true, verified: true, code: "VERIFIED" });
+    return;
   } catch (err: any) {
     console.error("❌ /users/otp/verify failed:", err?.message || err);
     res.status(500).json({ message: "فشل التحقق", error: err?.message });
   }
-});   
+});
 
 export default router;

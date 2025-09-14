@@ -1,6 +1,6 @@
 // src/controllers/admin/adminDeliveryController.ts
 import { Request, Response } from "express";
-import Order from "../../models/delivry_Marketplace_V1/Order";
+import Order from "../../models/delivery_marketplace_v1/Order";
 import driverReviewModel from "../../models/Driver_app/driverReview.model";
 
 export const getDeliveryKPIs = async (req: Request, res: Response) => {

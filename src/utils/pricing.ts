@@ -1,6 +1,6 @@
 import { getDistance } from "geolib";
-import UtilityPricing from "../models/delivry_Marketplace_V1/UtilityPricing";
-import PricingStrategy from "../models/delivry_Marketplace_V1/PricingStrategy";
+import UtilityPricing from "../models/delivery_marketplace_v1/UtilityPricing";
+import PricingStrategy from "../models/delivery_marketplace_v1/PricingStrategy";
 import { calculateDeliveryPrice } from "./deliveryPricing";
 
 type WaterSizeKey = "small" | "medium" | "large";

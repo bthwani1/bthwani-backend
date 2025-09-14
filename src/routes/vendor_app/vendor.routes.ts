@@ -6,7 +6,7 @@ import { verifyFirebase } from "../../middleware/verifyFirebase";
 import { verifyAdmin } from "../../middleware/verifyAdmin";
 import { addVendor } from "../../controllers/admin/vendorController";
 import Vendor from "../../models/vendor_app/Vendor";
-import Order from "../../models/delivry_Marketplace_V1/Order";
+import Order from "../../models/delivery_marketplace_v1/Order";
 import { verifyVendorJWT } from "../../middleware/verifyVendorJWT";
 import MerchantProduct from "../../models/mckathi/MerchantProduct";
 

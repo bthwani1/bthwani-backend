@@ -15,20 +15,20 @@ export const payBillHandler = async (req: Request, res: Response) => {
   try {
     const result = await sendTopup(product, recipient, externalId);
     await TopupLog.create({
+      type: "bill",
       product,
       recipient,
       externalId,
       status: result.status,
       response: result,
-      userId: req.user?.id,
+      userId: req.user!.id,
     });
+
     res.status(200).json(result);
   } catch (err: any) {
-    res
-      .status(500)
-      .json({
-        message: "Bill payment failed",
-        error: err?.response?.data || err.message,
-      });
+    res.status(500).json({
+      message: "Bill payment failed",
+      error: err?.response?.data || err.message,
+    });
   }
 };

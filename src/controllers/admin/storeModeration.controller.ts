@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import DeliveryStore from "../../models/delivry_Marketplace_V1/DeliveryStore";
+import DeliveryStore from "../../models/delivery_marketplace_v1/DeliveryStore";
 import mongoose from "mongoose";
 
 export async function list(req: Request, res: Response) {

@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import { INote } from "../models/delivry_Marketplace_V1/Order";
+import { INote } from "../models/delivery_marketplace_v1/Order";
 
 export function sanitizeNotes(raw: any): INote[] {
   const toNote = (v: any): INote | null => {

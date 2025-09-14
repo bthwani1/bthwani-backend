@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { WithdrawalRequest } from "../../models/Wallet_V8/WithdrawalRequest";
 import VacationRequest from "../../models/Driver_app/VacationRequest";
-import Order from "../../models/delivry_Marketplace_V1/Order";
+import Order from "../../models/delivery_marketplace_v1/Order";
 import mongoose from "mongoose";
 import Driver from "../../models/Driver_app/driver";
 
@@ -9,7 +9,12 @@ import Driver from "../../models/Driver_app/driver";
 export const requestVacation = async (req: Request, res: Response) => {
   const driverId = req.user!.id;
   const { fromDate, toDate, reason } = req.body;
-  const reqVac = await VacationRequest.create({ driverId, fromDate, toDate, reason });
+  const reqVac = await VacationRequest.create({
+    driverId,
+    fromDate,
+    toDate,
+    reason,
+  });
   res.status(201).json(reqVac);
 };
 export const getAssignedOrders = async (req: Request, res: Response) => {
@@ -35,20 +40,25 @@ export const getDriverReports = async (req: Request, res: Response) => {
     let start: Date;
     if (period === "weekly") {
       start = new Date(now.setDate(now.getDate() - now.getDay()));
-    } else { // daily
+    } else {
+      // daily
       start = new Date(now.setHours(0, 0, 0, 0));
     }
 
     // عدّ الطلبات المكتملة والملغاة
     const stats = await Order.aggregate([
-      { $match: {
+      {
+        $match: {
           driver: driverId,
-          deliveredAt: { $gte: start }
-      }},
-      { $group: {
+          deliveredAt: { $gte: start },
+        },
+      },
+      {
+        $group: {
           _id: "$status",
-          count: { $sum: 1 }
-      }}
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
     res.json({ period, since: start, stats });
@@ -66,7 +76,7 @@ export const getActiveDriversCount = async (_req: Request, res: Response) => {
   try {
     const count = await Driver.countDocuments({
       isAvailable: true,
-      isBanned:    false
+      isBanned: false,
     });
     res.json({ activeDrivers: count });
   } catch (err: any) {

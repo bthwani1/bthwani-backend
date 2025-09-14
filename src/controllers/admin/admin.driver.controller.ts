@@ -1,15 +1,21 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
-import Order from "../../models/delivry_Marketplace_V1/Order";
-import Driver from "../../models/Driver_app/driver";    // ← هذا الاستيراد مطلوب
+import Order from "../../models/delivery_marketplace_v1/Order";
+import Driver from "../../models/Driver_app/driver"; // ← هذا الاستيراد مطلوب
 import { ensureGLForDriver } from "../../accounting/services/ensureEntityGL";
 
 export const createDriver = async (req: Request, res: Response) => {
   try {
     const {
-      fullName, phone, email, password, role, vehicleType,
-      isFemaleDriver, driverType,
-      residenceLocation: { address, governorate, city, lat, lng }
+      fullName,
+      phone,
+      email,
+      password,
+      role,
+      vehicleType,
+      isFemaleDriver,
+      driverType,
+      residenceLocation: { address, governorate, city, lat, lng },
     } = req.body;
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -47,7 +53,12 @@ export const createDriver = async (req: Request, res: Response) => {
 
     res.status(201).json(driver);
   } catch (error: any) {
-    res.status(500).json({ message: "Error creating driver", error: error?.message || error });
+    res
+      .status(500)
+      .json({
+        message: "Error creating driver",
+        error: error?.message || error,
+      });
   }
 };
 export const searchDrivers = async (req: Request, res: Response) => {
@@ -67,18 +78,18 @@ export const setJokerStatus = async (req: Request, res: Response) => {
   const { driverType, jokerFrom, jokerTo } = req.body;
   const driver = await Driver.findById(req.params.id);
   if (!driver) {
-     res.status(404).json({ message: "Driver not found" });
-     return;
+    res.status(404).json({ message: "Driver not found" });
+    return;
   }
 
   // عندما يكون joker نعين نافذة، وإلا نحذفها
   driver.driverType = driverType;
   if (driverType === "joker") {
     driver.jokerFrom = new Date(jokerFrom);
-    driver.jokerTo   = new Date(jokerTo);
+    driver.jokerTo = new Date(jokerTo);
   } else {
     driver.jokerFrom = undefined;
-    driver.jokerTo   = undefined;
+    driver.jokerTo = undefined;
   }
 
   await driver.save();
@@ -177,7 +188,7 @@ export const assignDriver = async (req: Request, res: Response) => {
     return;
   }
 
-  order.driver     = driver.id;
+  order.driver = driver.id;
   order.status = "preparing";
   order.assignedAt = new Date();
 

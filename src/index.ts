@@ -21,24 +21,23 @@ import driverWithdrawalRoutes from "./routes/driver_app/driver.withdrawal.routes
 import vendorRoutes from "./routes/vendor_app/vendor.routes";
 import storeStatsRoutes from "./routes/admin/storeStatsRoutes";
 import adminNotificationTestRoutes from "./routes/admin/admin.notifications.test";
-import deliveryCategoryRoutes from "./routes/delivry_marketplace_v1/DeliveryCategoryRoutes";
-import deliveryStoreRoutes from "./routes/delivry_marketplace_v1/DeliveryStoreRoutes";
-import deliveryProductRoutes from "./routes/delivry_marketplace_v1/DeliveryProductRoutes";
-import deliverySubCategoryRoutes from "./routes/delivry_marketplace_v1/DeliveryProductSubCategoryRoutes";
-import deliveryBannerRoutes from "./routes/delivry_marketplace_v1/DeliveryBannerRoutes";
-import DeliveryOfferRoutes from "./routes/delivry_marketplace_v1/DeliveryOfferRoutes";
-import deliveryCartRouter from "./routes/delivry_marketplace_v1/DeliveryCartRoutes";
-import deliveryOrderRoutes from "./routes/delivry_marketplace_v1/DeliveryOrderRoutes";
-import DeliveryOrder from "./models/delivry_Marketplace_V1/Order";
+import deliveryCategoryRoutes from "./routes/delivery_marketplace_v1/DeliveryCategoryRoutes";
+import deliveryStoreRoutes from "./routes/delivery_marketplace_v1/DeliveryStoreRoutes";
+import deliveryProductRoutes from "./routes/delivery_marketplace_v1/DeliveryProductRoutes";
+import deliverySubCategoryRoutes from "./routes/delivery_marketplace_v1/DeliveryProductSubCategoryRoutes";
+import deliveryBannerRoutes from "./routes/delivery_marketplace_v1/DeliveryBannerRoutes";
+import DeliveryOfferRoutes from "./routes/delivery_marketplace_v1/DeliveryOfferRoutes";
+import deliveryCartRouter from "./routes/delivery_marketplace_v1/DeliveryCartRoutes";
+import deliveryOrderRoutes from "./routes/delivery_marketplace_v1/DeliveryOrderRoutes";
 import StatestoreRoutes from "./routes/admin/storeStatsRoutes";
 import employeeRoutes from "./routes/er/employee.routes";
 import attendanceRoutes from "./routes/er/attendance.routes";
 import leaveRequestRoutes from "./routes/er/leaveRequest.routes";
 import performanceGoalRoutes from "./routes/er/performanceGoal.routes";
-import pricingStrategyRoutes from "./routes/delivry_marketplace_v1/pricingStrategy";
-import deliveryPromotionRoutes from "./routes/delivry_marketplace_v1/promotion.routes";
+import pricingStrategyRoutes from "./routes/delivery_marketplace_v1/pricingStrategy";
+import deliveryPromotionRoutes from "./routes/delivery_marketplace_v1/promotion.routes";
 import groceriesRoutes from "./routes/marchent/api";
-import storeSectionRoutes from "./routes/delivry_marketplace_v1/storeSection.routes";
+import storeSectionRoutes from "./routes/delivery_marketplace_v1/storeSection.routes";
 import chartAccountRoutes from "./routes/er/chartAccount.routes";
 import journalEntryRouter from "./routes/er/journalEntry.routes";
 import journalBookRouter from "./routes/er/journals.routes";
@@ -58,7 +57,7 @@ import adminVendorModeration from "./routes/admin/vendorModerationRoutes";
 import adminOnboarding from "./routes/admin/onboardingRoutes";
 import adminCommission from "./routes/admin/commissionPlansRoutes";
 import adminReports from "./routes/admin/reportsRoutes";
-import utilityRoutes from "./routes/delivry_marketplace_v1/utility";
+import utilityRoutes from "./routes/delivery_marketplace_v1/utility";
 import adminMarketers from "./routes/admin/marketersRoutes";
 import adminStoreModeration from "./routes/admin/storeModerationRoutes";
 import adminNotificationRoutes from "./routes/admin/admin.notifications.routes";
@@ -68,8 +67,13 @@ import quickOnboardRoutes from "./routes/field/quickOnboard.routes";
 import marketingAuthRoutes from "./routes/marketerV1/auth.routes";
 import onboardingRoutes from "./routes/field/onboarding.routes";
 import mediaMarketerRoutes from "./routes/marketerV1/mediaMarketerRoutes";
+import walletOrderRoutes from "./routes/Wallet_V8/walletOrderRoutes";
+import supportRoutes from "./routes/support.routes";
+import appRoutes from "./routes/app.routes";
+import walletRoutes from "./routes/Wallet_V8/wallet.routes";
 
 dotenv.config();
+console.log("[BOOT] pid:", process.pid, "build:", new Date().toISOString());
 
 const app = express();
 const server = http.createServer(app);
@@ -116,51 +120,63 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+app.use(`${API_PREFIX}/users`, userRoutes);
+app.use(`${API_PREFIX}/delivery/promotions`, deliveryPromotionRoutes);
+app.use(`${API_PREFIX}/delivery/categories`, deliveryCategoryRoutes);
+app.use(`${API_PREFIX}/delivery/stores`, deliveryStoreRoutes);
+app.use(`${API_PREFIX}/delivery/products`, deliveryProductRoutes);
+app.use(`${API_PREFIX}/delivery/offer`, DeliveryOfferRoutes);
+app.use(`${API_PREFIX}/delivery/cart`, deliveryCartRouter);
+app.use(`${API_PREFIX}/groceries`, groceriesRoutes);
+
+app.use(`${API_PREFIX}/delivery/order`, deliveryOrderRoutes);
+app.use(`${API_PREFIX}/delivery/subcategories`, deliverySubCategoryRoutes);
+app.use(`${API_PREFIX}/delivery/banners`, deliveryBannerRoutes);
+app.use(`${API_PREFIX}/delivery/sections`, storeSectionRoutes);
+app.use(`${API_PREFIX}/favorites`, favoritesRoutes);
+
+app.use(`${API_PREFIX}/wallet`, walletRoutes);
+app.use(`${API_PREFIX}/wallet/order`, walletOrderRoutes);
+app.use(`${API_PREFIX}`, pushRouter);
+
+app.use(`${API_PREFIX}/topup`, topupRoutes);
+app.use(`${API_PREFIX}/support`, supportRoutes);
+app.use(`${API_PREFIX}/app`, appRoutes);
+
+app.use(`${API_PREFIX}/admin`, adminRoutes);
+
+app.use(`${API_PREFIX}/admin/drivers`, adminDriverRoutes);
+app.use(`${API_PREFIX}/`, adminVendorModeration);
+
 app.use(`${API_PREFIX}/auth/`, marketingAuthRoutes);
 app.use(`${API_PREFIX}/`, onboardingRoutes);
 app.use(`${API_PREFIX}/`, adminReports);
 app.use(`${API_PREFIX}/files`, mediaMarketerRoutes);
 app.use(`${API_PREFIX}/field`, quickOnboardRoutes);
 // Routes (كما في كودك)
-app.use(`${API_PREFIX}/users`, userRoutes);
 app.use(`${API_PREFIX}/media`, mediaRoutes);
-app.use(`${API_PREFIX}`, StatestoreRoutes);
 app.use(`${API_PREFIX}/employees`, employeeRoutes);
 app.use(`${API_PREFIX}/attendance`, attendanceRoutes);
 app.use(`${API_PREFIX}/leaves`, leaveRequestRoutes);
 app.use(`${API_PREFIX}/goals`, performanceGoalRoutes);
 app.use(`${API_PREFIX}/accounts/chart`, chartAccountRoutes);
 app.use(`${API_PREFIX}/admin/notifications`, adminNotificationRoutes);
-app.use(`${API_PREFIX}/topup`, topupRoutes);
 app.use(`${API_PREFIX}/entries`, journalEntryRouter);
 app.use(`${API_PREFIX}/accounts`, chartAccountRoutes);
 app.use(`${API_PREFIX}/journals`, journalBookRouter);
-app.use(`${API_PREFIX}/admin`, adminRoutes);
-app.use(`${API_PREFIX}/admin/drivers`, adminDriverRoutes);
 app.use(`${API_PREFIX}/driver`, driverRoutes);
 app.use(`${API_PREFIX}/admin/withdrawals`, adminWithdrawalRoutes);
 app.use(`${API_PREFIX}/admin/storestats`, storeStatsRoutes);
 app.use(`${API_PREFIX}/admin/notifications`, adminNotificationRoutes);
-app.use(`${API_PREFIX}/delivery/categories`, deliveryCategoryRoutes);
-app.use(`${API_PREFIX}/delivery/stores`, deliveryStoreRoutes);
-app.use(`${API_PREFIX}/delivery/products`, deliveryProductRoutes);
-app.use(`${API_PREFIX}/delivery/offer`, DeliveryOfferRoutes);
-app.use(`${API_PREFIX}/delivery/cart`, deliveryCartRouter);
-app.use(`${API_PREFIX}/delivery/order`, deliveryOrderRoutes);
-app.use(`${API_PREFIX}/delivery/subcategories`, deliverySubCategoryRoutes);
-app.use(`${API_PREFIX}/delivery/banners`, deliveryBannerRoutes);
-app.use(`${API_PREFIX}/delivery/promotions`, deliveryPromotionRoutes);
-app.use(`${API_PREFIX}/delivery/sections`, storeSectionRoutes);
+
 app.use(`${API_PREFIX}`, passwordResetRouter);
-app.use(`${API_PREFIX}/favorites`, favoritesRoutes);
-app.use(`${API_PREFIX}/groceries`, groceriesRoutes);
-app.use(`${API_PREFIX}/`, pushRouter);
 app.use(`${API_PREFIX}/`, adminNotificationTestRoutes);
 app.use(`${API_PREFIX}/`, marketerStoreVendorRoutes);
 app.use(`${API_PREFIX}/`, marketerOverviewRoutes);
-app.use(`${API_PREFIX}/`, adminVendorModeration);
 app.use(`${API_PREFIX}/`, adminOnboarding);
 app.use(`${API_PREFIX}/`, adminCommission);
+app.use(`${API_PREFIX}`, StatestoreRoutes);
 
 app.use(`${API_PREFIX}/admin/marketers`, adminMarketers);
 app.use(`${API_PREFIX}/`, adminStoreModeration);
@@ -171,13 +187,6 @@ app.use(`${API_PREFIX}/`, rediasRoutes);
 app.use(`${API_PREFIX}/vendor`, vendorRoutes);
 app.use(`${API_PREFIX}/pricing-strategies`, pricingStrategyRoutes);
 app.use(`${API_PREFIX}/`, marketingRouter);
-
-app.get(`${API_PREFIX}/debug/uploads`, (_, res) => {
-  const fs = require("fs");
-  const path = require("path");
-  const files = fs.readdirSync(path.resolve("uploads"));
-  res.json({ files });
-});
 
 app.get("/", (_, res) => {
   res.send("bThwani backend is running ✅");
@@ -194,6 +203,7 @@ if (!MONGO_URI) {
 
 async function connectWithRetry(uri: string, maxAttempts = 10) {
   let attempt = 0;
+
   while (attempt < maxAttempts) {
     try {
       attempt++;
@@ -201,7 +211,9 @@ async function connectWithRetry(uri: string, maxAttempts = 10) {
         serverSelectionTimeoutMS: 30000,
         connectTimeoutMS: 30000,
       });
-      console.log("✅ Connected to MongoDB");
+      console.log("✅ Connected to MongoDB", {
+        db: mongoose.connection.db?.databaseName || "<unknown>",
+      });
       return;
     } catch (err: any) {
       console.error(

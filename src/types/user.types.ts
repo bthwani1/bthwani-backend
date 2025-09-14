@@ -1,9 +1,8 @@
-
 import { Request } from "express";
 
 // types/user.types.ts
 export interface Address {
-    _id?: string; // ✅ اجعل الـ _id اختيارياً
+  _id?: string; // ✅ اجعل الـ _id اختيارياً
 
   label?: string;
   location?: { lat: number; lng: number };
@@ -11,16 +10,17 @@ export interface Address {
   city?: string;
 }
 
-
 export interface Wallet {
   balance: number;
   currency: string;
   totalSpent: number;
   totalEarned: number;
   lastUpdated: Date;
-  loyaltyPoints:number;
-  escrow:number;
-  savings:number;
+  loyaltyPoints: number;
+  onHold: number;
+
+  escrow: number;
+  savings: number;
 }
 
 export interface Security {
@@ -32,15 +32,15 @@ export interface Transaction {
   amount: number;
   type: "credit" | "debit";
   description: string;
-  method:string;
-  status:string;
-  date?:Date;
+  method: string;
+  status: string;
+  date?: Date;
 }
 
 export interface ActivityLog {
   action: string;
   target: string;
-at?: Date;
+  at?: Date;
 }
 
 export interface FreelancerProfile {
@@ -58,8 +58,8 @@ export interface FreelancerProfile {
   }[];
 
   portfolioImages: string[];
-  badges?: string[]; 
-    reviews?: {
+  badges?: string[];
+  reviews?: {
     userId: string;
     rating: number;
     comment?: string;
@@ -78,24 +78,24 @@ export interface NotificationFeed {
 export interface UserType {
   fullName: string;
   aliasName?: string;
-  emailVerified:boolean;
-    freelancerProfile?: Partial<FreelancerProfile>;
-pushToken:  string ;
+  emailVerified: boolean;
+  freelancerProfile?: Partial<FreelancerProfile>;
+  pushToken: string;
   foundResolvedCount?: number;
   badges?: string[];
   email?: string;
-  negativeRatingCount:number;
-  classification:string;
+  negativeRatingCount: number;
+  classification: string;
   isBlacklisted: boolean;
   phone?: string;
   profileImage?: string;
   role: "user" | "admin" | "superadmin" | "driver";
   bloodRequests: string[]; // ObjectId[] → معرفات الطلبات التي أنشأها
-donationLocation?: {
-  type?: "Point";
-  coordinates?: [number, number];
-  updatedAt?: Date;
-};
+  donationLocation?: {
+    type?: "Point";
+    coordinates?: [number, number];
+    updatedAt?: Date;
+  };
   donationHistory: {
     requestId: string;
     date: Date;
@@ -104,14 +104,14 @@ donationLocation?: {
       lng: number;
     };
   }[];
- isDriver?: boolean;
+  isDriver?: boolean;
   isAvailableForDelivery?: boolean;
   currentLocation?: {
     lat: number;
     lng: number;
     updatedAt: Date;
   };
-    subscription?: {
+  subscription?: {
     planId: string;
     startedAt: Date;
     nextBilling: Date;
@@ -122,7 +122,7 @@ donationLocation?: {
     totalDistanceKm: number;
     earnings: number;
   };
-  
+
   firebaseUID: string;
   authProvider: "firebase" | "local";
 
@@ -133,7 +133,7 @@ donationLocation?: {
   following: string[];
 
   addresses: Address[];
-defaultAddressId: { type: String, default: null },
+  defaultAddressId: { type: String; default: null };
 
   language: "ar" | "en";
   theme: "light" | "dark";
@@ -142,7 +142,7 @@ defaultAddressId: { type: String, default: null },
     sms: boolean;
     push: boolean;
   };
-availability:boolean;
+  availability: boolean;
   postsCount: number;
   messagesCount: number;
   followersCount: number;
@@ -153,7 +153,6 @@ availability:boolean;
     userAgent: string;
     at: Date;
   }[];
-
 
   favorites: string[]; // ObjectId[]
   notificationsFeed: NotificationFeed[];

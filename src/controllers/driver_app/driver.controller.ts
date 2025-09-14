@@ -7,7 +7,7 @@ import { User } from "../../models/user";
 import { OTP } from "../../models/otp";
 import { generateOTP } from "../../utils/otp";
 import { sendWhatsAppMessage } from "../../utils/whatsapp";
-import Order from "../../models/delivry_Marketplace_V1/Order";
+import Order from "../../models/delivery_marketplace_v1/Order";
 import driverReviewModel from "../../models/Driver_app/driverReview.model";
 import mongoose, { Types } from "mongoose";
 import dispatchOffer from "../../models/dispatchOffer";
@@ -280,13 +280,21 @@ export const completeOrder = async (req: Request, res: Response) => {
     }
     // سلّم الفرعي
     sub.status = "delivered";
-    sub.statusHistory.push({ status: "delivered", changedAt: new Date(), changedBy: "driver" });
+    sub.statusHistory.push({
+      status: "delivered",
+      changedAt: new Date(),
+      changedBy: "driver",
+    });
 
     // إن اكتملت كل الـ subOrders، أكمِل العلوي
     if (order.subOrders.every((s: any) => s.status === "delivered")) {
       order.status = "delivered";
       order.deliveredAt = new Date();
-      order.statusHistory.push({ status: "delivered", changedAt: new Date(), changedBy: "driver" });
+      order.statusHistory.push({
+        status: "delivered",
+        changedAt: new Date(),
+        changedBy: "driver",
+      });
     }
   } else {
     // علوي
@@ -296,7 +304,11 @@ export const completeOrder = async (req: Request, res: Response) => {
     }
     order.status = "delivered";
     order.deliveredAt = new Date();
-    order.statusHistory.push({ status: "delivered", changedAt: new Date(), changedBy: "driver" });
+    order.statusHistory.push({
+      status: "delivered",
+      changedAt: new Date(),
+      changedBy: "driver",
+    });
   }
 
   // لو عندك مشكلة notes قديمة:
@@ -305,7 +317,6 @@ export const completeOrder = async (req: Request, res: Response) => {
 
   res.json({ message: "Order marked as delivered", order });
 };
-
 
 export const addReviewForUser = async (req: Request, res: Response) => {
   const { orderId, userId, rating, comment } = req.body;
@@ -333,11 +344,13 @@ export const listDriverOffers = async (req: Request, res: Response) => {
   const driverId = req.user.id;
   const now = new Date();
 
-  const offers = await dispatchOffer.find({
-    driver: driverId,
-    status: "pending",
-    expiresAt: { $gt: now },
-  }).lean();
+  const offers = await dispatchOffer
+    .find({
+      driver: driverId,
+      status: "pending",
+      expiresAt: { $gt: now },
+    })
+    .lean();
 
   // جِب مختصر الطلبات
   const orderIds = [...new Set(offers.map((o) => o.order.toString()))];
@@ -364,12 +377,14 @@ export const acceptOffer = async (req: Request, res: Response) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const offer: any = await dispatchOffer.findOne({
-      _id: offerId,
-      driver: driverId,
-      status: "pending",
-      expiresAt: { $gt: new Date() },
-    }).session(session);
+    const offer: any = await dispatchOffer
+      .findOne({
+        _id: offerId,
+        driver: driverId,
+        status: "pending",
+        expiresAt: { $gt: new Date() },
+      })
+      .session(session);
 
     if (!offer) {
       await session.abortTransaction();
@@ -394,7 +409,11 @@ export const acceptOffer = async (req: Request, res: Response) => {
       }
       if (sub.driver) {
         // ضاعت عليك — حدّث العرض كمنتهي
-        await dispatchOffer.findByIdAndUpdate(offer._id, { status: "expired" }, { session });
+        await dispatchOffer.findByIdAndUpdate(
+          offer._id,
+          { status: "expired" },
+          { session }
+        );
         await session.commitTransaction();
         res.status(409).json({ message: "Already assigned" });
         return;
@@ -403,10 +422,18 @@ export const acceptOffer = async (req: Request, res: Response) => {
       // إسناد فعلي للفرعي
       sub.driver = new mongoose.Types.ObjectId(driverId);
       order.assignedAt = order.assignedAt ?? new Date();
-      order.statusHistory.push({ status: "assigned", changedAt: new Date(), changedBy: "driver" });
+      order.statusHistory.push({
+        status: "assigned",
+        changedAt: new Date(),
+        changedBy: "driver",
+      });
     } else {
       if (order.driver) {
-        await dispatchOffer.findByIdAndUpdate(offer._id, { status: "expired" }, { session });
+        await dispatchOffer.findByIdAndUpdate(
+          offer._id,
+          { status: "expired" },
+          { session }
+        );
         await session.commitTransaction();
         res.status(409).json({ message: "Already assigned" });
         return;
@@ -414,7 +441,11 @@ export const acceptOffer = async (req: Request, res: Response) => {
       // إسناد علوي
       order.driver = new mongoose.Types.ObjectId(driverId);
       order.assignedAt = new Date();
-      order.statusHistory.push({ status: "assigned", changedAt: new Date(), changedBy: "driver" });
+      order.statusHistory.push({
+        status: "assigned",
+        changedAt: new Date(),
+        changedBy: "driver",
+      });
     }
 
     await order.save({ session, validateModifiedOnly: true });
@@ -439,7 +470,11 @@ export const acceptOffer = async (req: Request, res: Response) => {
     // io.to(`user_${order.user.toString()}`).emit("notification", { ... });
     // io.to(`driver_${driverId}`).emit("assignment:confirmed", { orderId: order._id });
 
-    res.json({ message: "Assigned to you", orderId: order._id.toString(), subId: offer.subOrder || null });
+    res.json({
+      message: "Assigned to you",
+      orderId: order._id.toString(),
+      subId: offer.subOrder || null,
+    });
   } catch (e: any) {
     await session.abortTransaction();
     res.status(500).json({ message: e.message });

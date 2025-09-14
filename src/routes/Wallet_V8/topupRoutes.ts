@@ -1,7 +1,10 @@
 // src/routes/topupRoutes.ts
 
 import express from "express";
-import { getLogsHandler, topupHandler } from "../../controllers/Wallet_V8/topupController";
+import {
+  getLogsHandler,
+  topupHandler,
+} from "../../controllers/Wallet_V8/topupController";
 import { payBillHandler } from "../../controllers/Wallet_V8/payBillController";
 import { verifyFirebase } from "../../middleware/verifyFirebase";
 import { TopupLog } from "../../models/Wallet_V8/TopupLog";
@@ -45,7 +48,7 @@ const router = express.Router();
  *       500:
  *         description: خطأ في الخادم أثناء معالجة الشحنة.
  */
-router.post("/", topupHandler);
+router.post("/", verifyFirebase, topupHandler);
 
 /**
  * @swagger
@@ -79,7 +82,7 @@ router.post("/", topupHandler);
  *       500:
  *         description: خطأ في الخادم أثناء معالجة الدفع.
  */
-router.post("/pay-bill", payBillHandler);
+router.post("/pay-bill", verifyFirebase, payBillHandler);
 
 /**
  * @swagger
