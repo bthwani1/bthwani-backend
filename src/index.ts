@@ -71,6 +71,7 @@ import walletOrderRoutes from "./routes/Wallet_V8/walletOrderRoutes";
 import supportRoutes from "./routes/support.routes";
 import appRoutes from "./routes/app.routes";
 import walletRoutes from "./routes/Wallet_V8/wallet.routes";
+import metaRoutes from "./routes/meta";
 
 dotenv.config();
 console.log("[BOOT] pid:", process.pid, "build:", new Date().toISOString());
@@ -132,7 +133,8 @@ app.use(`${API_PREFIX}/delivery/products`, deliveryProductRoutes);
 app.use(`${API_PREFIX}/delivery/offer`, DeliveryOfferRoutes);
 app.use(`${API_PREFIX}/delivery/cart`, deliveryCartRouter);
 app.use(`${API_PREFIX}/groceries`, groceriesRoutes);
-
+app.use(`${API_PREFIX}/meta`, metaRoutes);
+app.use(`${API_PREFIX}/utility`, utilityRoutes);
 app.use(`${API_PREFIX}/delivery/subcategories`, deliverySubCategoryRoutes);
 app.use(`${API_PREFIX}/delivery/banners`, deliveryBannerRoutes);
 app.use(`${API_PREFIX}/delivery/sections`, storeSectionRoutes);

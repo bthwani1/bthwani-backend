@@ -14,6 +14,7 @@ export const getUtilityOptions = async (req: Request, res: Response) => {
       city,
       gas: cfg.gas?.enabled
         ? {
+            city, // ✅ مهم لواجهة الأدمن
             cylinderSizeLiters: cfg.gas.cylinderSizeLiters,
             pricePerCylinder: cfg.gas.pricePerCylinder,
             minQty: cfg.gas.minQty ?? 1,
@@ -23,11 +24,12 @@ export const getUtilityOptions = async (req: Request, res: Response) => {
         : null,
       water: cfg.water?.enabled
         ? {
+            city, // ✅ مهم لواجهة الأدمن
             sizes: cfg.water.sizes,
             allowHalf: cfg.water.allowHalf,
             halfPolicy: cfg.water.halfPricingPolicy,
-            flatFee: cfg.water.deliveryOverride?.flatFee ?? null,
             deliveryPolicy: cfg.water.deliveryOverride?.policy ?? "strategy",
+            flatFee: cfg.water.deliveryOverride?.flatFee ?? null,
           }
         : null,
     });

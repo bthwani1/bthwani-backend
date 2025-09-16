@@ -5,6 +5,7 @@ import { computeIsOpen } from "../../utils/storeStatus";
 import Vendor from "../../models/vendor_app/Vendor";
 import { ensureGLForStore } from "../../accounting/services/ensureEntityGL";
 import { Types } from "mongoose";
+import DeliveryCategory from "../../models/delivery_marketplace_v1/DeliveryCategory";
 
 // Create a new delivery store
 export const create = async (req: Request, res: Response) => {
@@ -94,54 +95,151 @@ export const create = async (req: Request, res: Response) => {
 };
 
 // Read all delivery stores
+
+// اجمع كل الأبناء (descendants) لفئة مُعطاة (بما فيهم الأصل)
+async function collectDescendantCategoryIds(rootId?: string) {
+  const objIds: mongoose.Types.ObjectId[] = [];
+  const strIds: string[] = [];
+  if (!rootId) return { objIds, strIds };
+
+  const rootStr = String(rootId);
+  const rootObj = mongoose.Types.ObjectId.isValid(rootStr)
+    ? new mongoose.Types.ObjectId(rootStr)
+    : null;
+
+  const visited = new Set<string>();
+  const stack: (string | mongoose.Types.ObjectId)[] = [rootObj || rootStr];
+
+  while (stack.length) {
+    const cur = stack.pop()!;
+    const curStr = String(cur);
+    if (visited.has(curStr)) continue;
+    visited.add(curStr);
+
+    // أضف المعرف الحالي
+    const curObj = mongoose.Types.ObjectId.isValid(curStr)
+      ? new mongoose.Types.ObjectId(curStr)
+      : null;
+    if (curObj) objIds.push(curObj);
+    strIds.push(curStr);
+
+    // اجلب الأطفال مباشرة (ندعم parent أو parentId كسلسلة أو ObjectId)
+    const children = await DeliveryCategory.find(
+      {
+        $or: [
+          { parent: curObj },
+          { parent: curStr },
+          { parentId: curObj },
+          { parentId: curStr },
+        ],
+      },
+      { _id: 1 }
+    ).lean();
+
+    for (const c of children) {
+      if (c?._id) stack.push(c._id as string);
+    }
+  }
+
+  return { objIds, strIds };
+}
+
 // Read all delivery stores
 export const getAll = async (req: Request, res: Response) => {
   try {
-    const { categoryId, usageType } = req.query;
+    const { categoryId, usageType } = req.query as {
+      categoryId?: string;
+      usageType?: string;
+    };
 
-    // ✅ اعتبر المتجر فعّالاً ما لم يكن isActive === false
+    // ✅ المتاجر الفعالة
     const activeMatch: any = {
       $or: [{ isActive: { $ne: false } }, { isActive: { $exists: false } }],
     };
 
-    const match: any = { ...activeMatch };
+    // ✅ جهّز معرّفات الفئة + كل الأبناء
+    const { objIds: catObjIds, strIds: catStrIds } =
+      await collectDescendantCategoryIds(categoryId);
 
-    // ✅ فلترة النوع (لو مرّرته من الواجهة)
-    if (usageType) match.usageType = usageType;
+    // فلترة الفئات (إن وُجدت)
+    const categoryFilter = (catObjIds.length || catStrIds.length) && {
+      $or: [
+        ...(catObjIds.length ? [{ category: { $in: catObjIds } }] : []),
+        ...(catStrIds.length ? [{ category: { $in: catStrIds } }] : []),
+      ],
+    };
 
-    // ✅ فئة: طابق في category المفرد و categories[] كـ ObjectId وكـ String
-    if (categoryId) {
-      const cidStr = String(categoryId);
-      const cidObj = mongoose.Types.ObjectId.isValid(cidStr)
-        ? new mongoose.Types.ObjectId(cidStr)
-        : null;
-
-      const orForCategory: any[] = [];
-      if (cidObj) {
-        orForCategory.push({ category: cidObj }, { categories: cidObj });
-      }
-      // دعم السجلات القديمة/المعطوبة التي خزّنت كسلسلة
-      orForCategory.push({ category: cidStr }, { categories: cidStr });
-
-      match.$and = [...(match.$and || []), { $or: orForCategory }];
-    }
-
-    // ⚠️ اللوج يجب أن يطبع نفس الشيء الذي سنستعلم به
     console.log(
-      "[stores] DB:",
+      "[stores.getAll] DB:",
       mongoose.connection.db.databaseName,
-      "match:",
-      JSON.stringify(match)
+      "usageType=",
+      usageType,
+      "categoryId=",
+      categoryId,
+      "catObjIds=",
+      catObjIds.map((x) => String(x)),
+      "catStrIds=",
+      catStrIds
     );
 
-    const stores = await DeliveryStore.find(match)
-      .populate("category") // ref: DeliveryCategory
-      .sort({ createdAt: -1 })
-      .lean();
+    let raw: any[] = [];
 
-    console.log("[stores] count:", stores.length);
+    if (usageType) {
+      // ✅ عندما يمرّر usageType: طابق إمّا usageType على المتجر أو usageType على الفئة
+      const pipeline: any[] = [];
 
-    const enriched = stores.map((store) => ({
+      pipeline.push({
+        $match: {
+          ...activeMatch,
+          ...(categoryFilter ? categoryFilter : {}),
+        },
+      });
+
+      // جلب usageType من الفئة
+      pipeline.push({
+        $lookup: {
+          from: "deliverycategories",
+          localField: "category",
+          foreignField: "_id",
+          as: "cat",
+          pipeline: [{ $project: { usageType: 1 } }],
+        },
+      });
+      pipeline.push({
+        $addFields: { catUsage: { $arrayElemAt: ["$cat.usageType", 0] } },
+      });
+
+      pipeline.push({
+        $match: {
+          $or: [
+            { usageType: String(usageType) },
+            { catUsage: String(usageType) },
+          ],
+        },
+      });
+
+      pipeline.push({ $sort: { createdAt: -1 } });
+      pipeline.push({ $project: { cat: 0, catUsage: 0 } });
+
+      raw = await (DeliveryStore as any).aggregate(pipeline, {
+        allowDiskUse: true,
+      });
+    } else {
+      // ✅ بدون usageType
+      const match: any = { ...activeMatch, ...(categoryFilter || {}) };
+
+      // اطبع الـ match للتحقق
+      console.log("[stores.getAll] match:", JSON.stringify(match));
+
+      raw = await DeliveryStore.find(match)
+        .populate("category") // ref: DeliveryCategory
+        .sort({ createdAt: -1 })
+        .lean();
+    }
+
+    console.log("[stores.getAll] count:", raw.length);
+
+    const enriched = raw.map((store) => ({
       ...store,
       isOpen: computeIsOpen(
         store.schedule,
@@ -152,6 +250,7 @@ export const getAll = async (req: Request, res: Response) => {
 
     res.json(enriched);
   } catch (error: any) {
+    console.error("getAll error:", error?.message || error);
     res.status(500).json({ message: error.message });
   }
 };
