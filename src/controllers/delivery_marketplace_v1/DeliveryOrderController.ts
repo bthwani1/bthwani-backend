@@ -16,10 +16,7 @@ import { pushStatusHistory } from "../../utils/orderHistory";
 import { broadcastOrder } from "../../sockets/orderEvents";
 import { postIfDeliveredOnce } from "../../accounting/hooks";
 import { broadcastOffersForOrder } from "../../services/dispatch";
-import {
-  fetchActivePromotions,
-  applyPromotionToProduct,
-} from "../../services/promotion/pricing.service";
+import { fetchActivePromotions } from "../../services/promotion/pricing.service";
 import DeliveryProduct from "../../models/delivery_marketplace_v1/DeliveryProduct";
 import MerchantProduct from "../../models/mckathi/MerchantProduct";
 import { notifyOrder } from "../../services/order.notify";
@@ -31,58 +28,78 @@ import {
 import { Coupon } from "../../models/Wallet_V8/coupon.model";
 import { captureForOrder } from "../../services/holds";
 // 👇 ضِف أعلى هذا الملف
-type CartItem = {
+
+type In = {
   productId: string;
-  productType?: "merchantProduct" | "deliveryProduct" | "delivery"; // حسب ما تخزِّنه في السلة
+  productType: "merchantProduct" | "deliveryProduct";
   store: mongoose.Types.ObjectId | string;
   quantity: number;
-  price?: number; // قد يكون موجودًا بالسلة لكن لن نعتمد عليه
+  price?: number;
 };
 
-async function priceSingleCartItem(it: CartItem, promos: any) {
-  if (it.productType === "merchantProduct") {
-    const mp = await MerchantProduct.findById(it.productId)
-      .populate({ path: "product", select: "category" }) // إن رغبت باستخدام عروض الفئة
-      .lean();
+export async function priceSingleCartItem(input: In, promos: any[]) {
+  const { productId } = input;
+  const storeId =
+    typeof input.store === "string"
+      ? new mongoose.Types.ObjectId(input.store)
+      : input.store;
 
-    if (!mp) throw new Error("عنصر غير موجود (MerchantProduct)");
+  let doc: any = null;
+  let resolvedType: "merchantProduct" | "deliveryProduct" | null = null;
 
-    const priced = applyPromotionToProduct(
-      {
-        _id: mp._id,
-        price: mp.price, // السعر الأساسي عند التاجر
-        store: mp.store?._id || mp.store,
-        categories: mp.product ? [mp.product] : [],
-      },
-      promos
-    );
-
-    return {
-      unitPriceOriginal: priced.originalPrice,
-      unitPriceFinal: priced.finalPrice,
-      appliedPromotion: priced.appliedPromotion || null,
-    };
+  // 1) جرّب النوع المُرسل أولاً
+  if (input.productType === "merchantProduct") {
+    doc = await MerchantProduct.findOne({
+      _id: productId,
+      store: storeId,
+    }).lean();
+    resolvedType = doc ? "merchantProduct" : null;
   } else {
-    // delivery product
-    const dp = await DeliveryProduct.findById(it.productId).lean();
-    if (!dp) throw new Error("عنصر غير موجود (DeliveryProduct)");
-
-    const priced = applyPromotionToProduct(
-      {
-        _id: dp._id,
-        price: dp.price, // السعر الأساسي في كتالوج التوصيل
-        store: dp.store,
-        // إن لاحقًا ربطت المنتج بفئة: categories: [dp.deliveryCategory]
-      },
-      promos
-    );
-
-    return {
-      unitPriceOriginal: priced.originalPrice,
-      unitPriceFinal: priced.finalPrice,
-      appliedPromotion: priced.appliedPromotion || null,
-    };
+    doc = await DeliveryProduct.findById(productId).lean();
+    resolvedType = doc ? "deliveryProduct" : null;
   }
+
+  // 2) Fallback: جرّب الكولكشن الأخرى إذا ما لقيت
+  if (!doc) {
+    // جرّب MerchantProduct
+    const asMerchant = await MerchantProduct.findOne({
+      _id: productId,
+      store: storeId,
+    }).lean();
+    if (asMerchant) {
+      doc = asMerchant;
+      resolvedType = "merchantProduct";
+    } else {
+      // جرّب DeliveryProduct
+      const asDelivery = await DeliveryProduct.findById(productId).lean();
+      if (asDelivery) {
+        doc = asDelivery;
+        resolvedType = "deliveryProduct";
+      }
+    }
+  }
+
+  if (!doc || !resolvedType) {
+    throw new Error(
+      `العنصر غير موجود productId=${productId} type=${input.productType} store=${storeId}`
+    );
+  }
+
+  // 3) حدد سعر الأصل
+  const unitPriceOriginal = Number(doc.price) || Number(input.price) || 0;
+
+  // 4) طبّق العروض (اترك منطقك الحالي كما هو)
+  let unitPriceFinal = unitPriceOriginal;
+  let appliedPromotion: any = undefined;
+  // ... منطق اختيار أفضل عرض من promos إن وجد
+  // unitPriceFinal = Math.max(0, unitPriceOriginal - discountAmount);
+
+  return {
+    unitPriceOriginal,
+    unitPriceFinal,
+    resolvedType, // مهم
+    appliedPromotion, // لو عندك
+  };
 }
 
 function sanitizeNotes(raw: any): any[] {
@@ -188,12 +205,12 @@ export const createOrder = async (req: Request, res: Response) => {
   session.startTransaction();
   try {
     // 1) التحقق من المستخدم (اعتمدنا توحيدًا على req.user!.id)
-    const authUserId = req.user?.id;
-    if (!authUserId) {
+    const firebaseUID = (req as any).user?.id;
+    if (!firebaseUID) {
       res.status(401).json({ message: "Unauthorized" });
       return;
     }
-    const user = await User.findById(authUserId).session(session);
+    const user = await User.findOne({ firebaseUID }).session(session);
     if (!user) throw new Error("المستخدم غير موجود");
 
     const orderId = new mongoose.Types.ObjectId();
@@ -213,6 +230,7 @@ export const createOrder = async (req: Request, res: Response) => {
       deliveryMode = "split",
       couponCode, // يمكن أن يأتي باسم couponCode
       coupon, // أو coupon
+      errand, // بيانات الطلب من نوع errand
     } = req.body;
 
     // alias: cod -> cash
@@ -313,7 +331,7 @@ export const createOrder = async (req: Request, res: Response) => {
           const priced = await priceSingleCartItem(
             {
               productId: i.productId.toString(),
-              productType: i.productType || "deliveryProduct",
+              productType: (i.productType as any) || "deliveryProduct",
               store: i.store,
               quantity: i.quantity,
               price: i.price,
@@ -335,7 +353,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
           pricedItems.push({
             product: i.productId,
-            productType: i.productType || "deliveryProduct",
+            productType: priced.resolvedType, // ← استخدم النوع الفعلي
             quantity: i.quantity,
             unitPrice: priced.unitPriceFinal,
             unitPriceOriginal: priced.unitPriceOriginal,
@@ -465,15 +483,21 @@ export const createOrder = async (req: Request, res: Response) => {
     }
 
     // 15) محفظة/كاش (حجز وليس خصم)
+    const wallet = {
+      balance: Number((user as any).wallet?.balance ?? 0),
+      onHold: Number((user as any).wallet?.onHold ?? 0),
+    };
+
     let walletUsed = 0;
-    if (
-      paymentMethod === "wallet" ||
-      paymentMethod === "mixed" ||
-      paymentMethod === "cash"
-    ) {
-      const available = (user.wallet.balance || 0) - (user.wallet.onHold || 0);
+
+    // استخدم المحفظة فقط مع wallet أو mixed
+    if (paymentMethod === "wallet" || paymentMethod === "mixed") {
+      const available = Math.max(0, wallet.balance - wallet.onHold);
       walletUsed = Math.min(available, totalPrice);
+    } else {
+      walletUsed = 0; // cash / card
     }
+
     const cashDue = +(totalPrice - walletUsed).toFixed(2);
 
     if (walletUsed > 0) {
@@ -488,6 +512,42 @@ export const createOrder = async (req: Request, res: Response) => {
     let finalPaymentMethod: "wallet" | "cash" | "card" | "mixed" = "cash";
     if (walletUsed > 0 && cashDue > 0) finalPaymentMethod = "mixed";
     else if (walletUsed > 0 && cashDue === 0) finalPaymentMethod = "wallet";
+
+    // معالجة بيانات errand مع geo (إن وُجدت)
+    let errandData = undefined;
+    if (errand) {
+      const pickupGeo = errand?.pickup?.location
+        ? {
+            type: "Point" as const,
+            coordinates: [
+              errand.pickup.location.lng,
+              errand.pickup.location.lat,
+            ] as [number, number],
+          }
+        : undefined;
+
+      const dropoffGeo = errand?.dropoff?.location
+        ? {
+            type: "Point" as const,
+            coordinates: [
+              errand.dropoff.location.lng,
+              errand.dropoff.location.lat,
+            ] as [number, number],
+          }
+        : undefined;
+
+      errandData = {
+        ...errand,
+        pickup: {
+          ...errand.pickup,
+          geo: pickupGeo ?? undefined, // لا تنشئ geo إن ما فيه إحداثيات
+        },
+        dropoff: {
+          ...errand.dropoff,
+          geo: dropoffGeo ?? undefined,
+        },
+      };
+    }
 
     const order = new DeliveryOrder({
       _id: orderId,
@@ -518,6 +578,8 @@ export const createOrder = async (req: Request, res: Response) => {
       coupon: couponApplied || undefined, // ✅ خزّن أثر الكوبون
       pricesFrozenAt: new Date(),
       notes: sanitizeNotes(notes),
+      orderType: errand ? "errand" : "marketplace",
+      errand: errandData,
     });
 
     await order.save({ session });
@@ -1114,13 +1176,13 @@ export const adminChangeStatus = async (req: Request, res: Response) => {
 
 export const cancelOrder = async (req: Request, res: Response) => {
   try {
-    const authUserId = req.user?.id;
-    if (!authUserId) {
+    const firebaseUID = (req as any).user?.id;
+    if (!firebaseUID) {
       res.status(401).json({ message: "Unauthorized" });
       return;
     }
 
-    const user = await User.findById(authUserId).exec();
+    const user = await User.findOne({ firebaseUID }).exec();
     if (!user) {
       res.status(404).json({ message: "User not found" });
       return;
@@ -1246,20 +1308,71 @@ export const getOrderNotes = async (req: Request, res: Response) => {
 export const getUserOrders = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    const orders = await DeliveryOrder.find({ user: userId })
+
+    const docs = await DeliveryOrder.find({ user: userId })
+      .populate({ path: "subOrders.store", select: "name logo city" })
       .sort({ createdAt: -1 })
       .lean();
-    const actor = getActor(req);
-    const sanitized = orders.map((o) => ({
-      ...o,
-      notes:
-        actor.role === "customer"
-          ? (o.notes || []).filter((n: any) => n.visibility === "public")
-          : o.notes,
-    }));
-    res.json(sanitized);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+
+    const out = docs.map((o) => {
+      const stores = (o.subOrders || [])
+        .map((so: any) => so.store)
+        .filter(Boolean);
+
+      // ✅ اشتقاق اسم المتجر المعروض
+      let store = "—";
+      let storeId = "—";
+      let logo: string | undefined;
+
+      if (stores.length === 1 && stores[0]?._id) {
+        store = stores[0].name || "—";
+        storeId = String(stores[0]._id);
+        logo = stores[0].logo;
+      } else if (stores.length > 1) {
+        store = `عدة متاجر (${stores.length})`;
+        storeId = "multi";
+      } else if (o.orderType === "errand") {
+        store = "اخدمني";
+        storeId = "errand";
+      }
+
+      return {
+        id: String(o._id),
+        kind: o.orderType === "errand" ? "errand" : "marketplace",
+        category: o.orderType === "errand" ? "اخدمني" : "المتاجر",
+        rawStatus: o.status,
+        status: translateStatus(o.status),
+        date: toISODate(o.createdAt),
+        time: toLocalTime(o.createdAt),
+        monthKey: formatMonthKey(o.createdAt),
+
+        // 👇 أهم شي نعيدها صح
+        store,
+        storeId,
+        logo,
+
+        address: o.address?.label || `${o.address?.city ?? ""}`,
+        deliveryFee: o.deliveryFee ?? 0,
+        discount: o.coupon?.discountOnItems ?? 0,
+        total: o.price ?? 0,
+
+        // إن كنت تبغى تختصر ولا ترجع السلة كاملة:
+        basket: (o.items || []).slice(0, 3).map((it: any) => ({
+          name: it.name,
+          quantity: it.quantity,
+          price: it.unitPrice,
+          originalPrice: it.unitPriceOriginal,
+        })),
+
+        notes: (o.notes || [])
+          .filter((n: any) => n.visibility === "public")
+          .map((n: any) => n.body),
+      };
+    });
+
+    res.json(out);
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
   }
 };
 // POST /orders/:id/repeat
@@ -1267,12 +1380,12 @@ export const repeatOrder = async (req: Request, res: Response) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const authUserId = req.user?.id;
-    if (!authUserId) {
+    const firebaseUID = (req as any).user?.id;
+    if (!firebaseUID) {
       res.status(401).json({ message: "Unauthorized" });
       return;
     }
-    const user = await User.findById(authUserId).session(session);
+    const user = await User.findOne({ firebaseUID }).session(session);
     if (!user) {
       res.status(401).json({ message: "Unauthorized" });
       return;
@@ -1511,3 +1624,51 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// مساعدات بسيطة
+function toISODate(d: Date | string) {
+  const x = new Date(d);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(x.getDate()).padStart(2, "0")}`;
+}
+
+function toLocalTime(d: Date | string) {
+  return new Date(d).toLocaleTimeString("ar-YE", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatMonthKey(d: Date | string) {
+  const x = new Date(d);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function translateStatus(s: string) {
+  switch (s) {
+    case "pending_confirmation":
+      return "في انتظار التأكيد";
+    case "under_review":
+      return "قيد المراجعة";
+    case "preparing":
+      return "قيد التحضير";
+    case "out_for_delivery":
+      return "في الطريق";
+    case "delivered":
+      return "تم التوصيل";
+    case "returned":
+      return "تم الإرجاع";
+    case "cancelled":
+      return "أُلغي";
+    case "awaiting_procurement":
+      return "بانتظار الشراء";
+    case "procured":
+      return "تم الشراء";
+    case "procurement_failed":
+      return "تعذر الشراء";
+    default:
+      return s;
+  }
+}

@@ -122,15 +122,17 @@ app.use((req, res, next) => {
 });
 
 app.use(`${API_PREFIX}/users`, userRoutes);
+app.use(`${API_PREFIX}/auth/password`, passwordResetRouter);
 app.use(`${API_PREFIX}/delivery/promotions`, deliveryPromotionRoutes);
 app.use(`${API_PREFIX}/delivery/categories`, deliveryCategoryRoutes);
+app.use(`${API_PREFIX}/delivery/order`, deliveryOrderRoutes);
+
 app.use(`${API_PREFIX}/delivery/stores`, deliveryStoreRoutes);
 app.use(`${API_PREFIX}/delivery/products`, deliveryProductRoutes);
 app.use(`${API_PREFIX}/delivery/offer`, DeliveryOfferRoutes);
 app.use(`${API_PREFIX}/delivery/cart`, deliveryCartRouter);
 app.use(`${API_PREFIX}/groceries`, groceriesRoutes);
 
-app.use(`${API_PREFIX}/delivery/order`, deliveryOrderRoutes);
 app.use(`${API_PREFIX}/delivery/subcategories`, deliverySubCategoryRoutes);
 app.use(`${API_PREFIX}/delivery/banners`, deliveryBannerRoutes);
 app.use(`${API_PREFIX}/delivery/sections`, storeSectionRoutes);
@@ -170,7 +172,6 @@ app.use(`${API_PREFIX}/admin/withdrawals`, adminWithdrawalRoutes);
 app.use(`${API_PREFIX}/admin/storestats`, storeStatsRoutes);
 app.use(`${API_PREFIX}/admin/notifications`, adminNotificationRoutes);
 
-app.use(`${API_PREFIX}`, passwordResetRouter);
 app.use(`${API_PREFIX}/`, adminNotificationTestRoutes);
 app.use(`${API_PREFIX}/`, marketerStoreVendorRoutes);
 app.use(`${API_PREFIX}/`, marketerOverviewRoutes);

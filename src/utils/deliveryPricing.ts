@@ -9,39 +9,40 @@ import { IPricingStrategy } from "../models/delivery_marketplace_v1/PricingStrat
  */
 // src/utils/deliveryPricing.ts
 export function calculateDeliveryPrice(
-  distance: number,
+  distanceKm: number,
   strategy: IPricingStrategy
 ): number {
-  // 1. إذا المسافة ضمن الـ baseDistance
-  if (distance <= strategy.baseDistance) {
-    return strategy.basePrice;
-  }
+  const d = Math.max(0, distanceKm);
 
-  // 2. احسب تكلفة الـ baseDistance
+  // داخل/حتى الـ baseDistance
+  if (d <= strategy.baseDistance) return strategy.basePrice;
+
   let cost = strategy.basePrice;
-  let remaining = distance - strategy.baseDistance;
+  // مسافة إضافية بعد الـ base
+  const extra = d - strategy.baseDistance;
 
-  // 3. رتب الشرائح
-  const sorted = [...strategy.tiers].sort(
+  // رتب الشرائح
+  const tiers = [...(strategy.tiers || [])].sort(
     (a, b) => a.minDistance - b.minDistance
   );
 
-  // 4. مرّ على الشرائح ولكن بعد الـ baseDistance
-  for (const tier of sorted) {
-    if (remaining <= 0) break;
-    // نحسب الجزء من الـ remaining الذي يقع ضمن هذه الشريحة
-    const start = tier.minDistance - strategy.baseDistance; // نحوّل إلى بعد الـ baseDistance
-    const end = tier.maxDistance - strategy.baseDistance;
-    if (remaining <= start) continue;
-    const inTier = Math.min(remaining, end) - Math.max(0, start);
-    cost += inTier * tier.pricePerKm;
-    remaining -= inTier;
+  // احسب مساهمة كل شريحة: التقاطع بين [baseDistance, d] و [min, max]
+  let coveredBeyondBase = 0;
+  for (const t of tiers) {
+    const start = Math.max(strategy.baseDistance, t.minDistance);
+    const end = Math.max(start, t.maxDistance); // تأكد end ≥ start
+    const overlap = Math.max(0, Math.min(d, end) - start);
+    if (overlap > 0) {
+      cost += overlap * t.pricePerKm;
+      coveredBeyondBase += overlap;
+    }
   }
 
-  // 5. إذا بقيت مسافة بعد آخر شريحة
-  if (remaining > 0) {
-    cost += remaining * strategy.defaultPricePerKm;
+  // المسافة المتبقية بعد آخر شريحة
+  const leftover = Math.max(0, extra - coveredBeyondBase);
+  if (leftover > 0) {
+    cost += leftover * strategy.defaultPricePerKm;
   }
 
-  return cost;
+  return +cost.toFixed(2);
 }

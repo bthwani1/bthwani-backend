@@ -386,8 +386,18 @@ orderSchema.add({
       phone: String,
       location: { lat: Number, lng: Number },
       geo: {
-        type: { type: String, enum: ["Point"], default: "Point" },
-        coordinates: { type: [Number], default: undefined }, // [lng, lat]
+        type: { type: String, enum: ["Point"] }, // لا default
+        coordinates: {
+          type: [Number], // [lng, lat]
+          validate: {
+            validator: (v: number[] | undefined) =>
+              !v ||
+              (Array.isArray(v) &&
+                v.length === 2 &&
+                v.every((n) => typeof n === "number")),
+            message: "geo.coordinates must be [lng, lat]",
+          },
+        },
       },
     },
     dropoff: {
@@ -398,8 +408,18 @@ orderSchema.add({
       phone: String,
       location: { lat: Number, lng: Number },
       geo: {
-        type: { type: String, enum: ["Point"], default: "Point" },
-        coordinates: { type: [Number], default: undefined }, // [lng, lat]
+        type: { type: String, enum: ["Point"] }, // لا default
+        coordinates: {
+          type: [Number], // [lng, lat]
+          validate: {
+            validator: (v: number[] | undefined) =>
+              !v ||
+              (Array.isArray(v) &&
+                v.length === 2 &&
+                v.every((n) => typeof n === "number")),
+            message: "geo.coordinates must be [lng, lat]",
+          },
+        },
       },
     },
     waypoints: [
@@ -415,8 +435,8 @@ orderSchema.add({
 
 // فهارس مفيدة (اختياري):
 orderSchema.index({ orderType: 1, createdAt: -1 });
-orderSchema.index({ "errand.pickup.geo": "2dsphere" });
-orderSchema.index({ "errand.dropoff.geo": "2dsphere" });
+orderSchema.index({ "errand.pickup.geo": "2dsphere" }, { sparse: true });
+orderSchema.index({ "errand.dropoff.geo": "2dsphere" }, { sparse: true });
 
 orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ "address.city": 1 });

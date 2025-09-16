@@ -3,12 +3,11 @@
 import express from "express";
 import * as controller from "../../controllers/delivery_marketplace_v1/DeliveryCartController";
 import { verifyFirebase } from "../../middleware/verifyFirebase";
-import { optionalAuth } from "../../middleware/optionalAuth";
+import { attachFirebaseIfPresent } from "../../middleware/attachFirebaseIfPresent";
 
 const router = express.Router();
 
 // السماح بالوصول الاختياري للمستخدم المسجّل أو الضيف
-router.use(optionalAuth);
 
 /**
  * @swagger
@@ -49,7 +48,7 @@ router.use(optionalAuth);
  *       500:
  *         description: خطأ في الخادم أثناء جلب سلة المستخدم.
  */
-router.get("/user/:userId", controller.getCart);
+router.get("/user/:userId", attachFirebaseIfPresent, controller.getCart);
 
 /**
  * @swagger
@@ -83,7 +82,7 @@ router.get("/user/:userId", controller.getCart);
  *       500:
  *         description: خطأ في الخادم أثناء جلب السلة.
  */
-router.get("/:cartId", controller.getCart);
+router.get("/:cartId", attachFirebaseIfPresent, controller.getCart);
 
 /**
  * @swagger
@@ -115,7 +114,7 @@ router.get("/:cartId", controller.getCart);
  *       500:
  *         description: خطأ في الخادم أثناء معالجة إضافة/تحديث العنصر.
  */
-router.post("/add", controller.addOrUpdateCart);
+router.post("/add", attachFirebaseIfPresent, controller.addOrUpdateCart);
 
 /**
  * @swagger
@@ -145,7 +144,7 @@ router.post("/add", controller.addOrUpdateCart);
  *       500:
  *         description: خطأ في الخادم أثناء تفريغ السلة.
  */
-router.delete("/user/:userId", controller.clearCart);
+router.delete("/user/:userId", attachFirebaseIfPresent, controller.clearCart);
 
 /**
  * @swagger
@@ -175,7 +174,7 @@ router.delete("/user/:userId", controller.clearCart);
  *       500:
  *         description: خطأ في الخادم أثناء تفريغ السلة.
  */
-router.delete("/:cartId", controller.clearCart);
+router.delete("/:cartId", attachFirebaseIfPresent, controller.clearCart);
 
 /**
  * @swagger
@@ -215,7 +214,11 @@ router.delete("/:cartId", controller.clearCart);
  *       500:
  *         description: خطأ في الخادم أثناء إزالة العنصر.
  */
-router.delete("/:cartId/items/:productId", controller.removeItem);
+router.delete(
+  "/:cartId/items/:productId",
+  attachFirebaseIfPresent,
+  controller.removeItem
+);
 
 /**
  * @swagger
@@ -255,7 +258,11 @@ router.delete("/:cartId/items/:productId", controller.removeItem);
  *       500:
  *         description: خطأ في الخادم أثناء إزالة العنصر.
  */
-router.delete("/user/:userId/items/:productId", controller.removeItem);
+router.delete(
+  "/user/:userId/items/:productId",
+  attachFirebaseIfPresent,
+  controller.removeItem
+);
 
 router.put(
   "/items/:productId",
@@ -263,7 +270,7 @@ router.put(
   controller.updateCartItemQuantity
 );
 
-router.get("/fee", controller.getDeliveryFee);
+router.get("/fee", attachFirebaseIfPresent, controller.getDeliveryFee);
 
 /**
  * @swagger

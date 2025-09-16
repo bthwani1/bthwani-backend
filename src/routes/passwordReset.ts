@@ -13,7 +13,7 @@ const router = Router();
  * يرسل OTP إلى الإيميل (purpose=resetPassword)
  */
 router.post(
-  "/auth/password/forgot",
+  "/forgot",
   body("email").isString().trim().isLength({ min: 5 }).isEmail(),
   requestPasswordReset
 );
@@ -23,7 +23,7 @@ router.post(
  * يتحقق من OTP ويُصدر resetToken (JWT قصير العمر)
  */
 router.post(
-  "/auth/password/verify",
+  "/verify",
   body("email").isString().trim().isLength({ min: 5 }).isEmail(),
   body("code").isString().trim().isLength({ min: 4, max: 8 }),
   verifyResetCode
@@ -34,7 +34,7 @@ router.post(
  * يعيّن كلمة مرور جديدة في Firebase Admin باستخدام resetToken
  */
 router.post(
-  "/auth/password/reset",
+  "/reset",
   body("resetToken").isString().notEmpty(),
   body("newPassword").isString().isLength({ min: 6, max: 128 }),
   submitNewPassword

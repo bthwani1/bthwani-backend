@@ -10,8 +10,8 @@ import { Types } from "mongoose";
 export const create = async (req: Request, res: Response) => {
   try {
     const body: any = { ...req.body };
-    if (req.user.role === "vendor") {
-      const vendor = await Vendor.findOne({ user: req.user.id });
+    if ((req as any).user?.role === "vendor") {
+      const vendor = await Vendor.findOne({ user: (req as any).user.id });
       if (!vendor) {
         res.status(403).json({ message: "ليس لديك حساب تاجر" });
         return;
@@ -94,43 +94,61 @@ export const create = async (req: Request, res: Response) => {
 };
 
 // Read all delivery stores
+// Read all delivery stores
 export const getAll = async (req: Request, res: Response) => {
   try {
-    const { categoryId } = req.query;
-    const filter: any = { isActive: true };
-    const query: any = { isActive: true }; // خفّف الشروط مؤقتاً
+    const { categoryId, usageType } = req.query;
+
+    // ✅ اعتبر المتجر فعّالاً ما لم يكن isActive === false
+    const activeMatch: any = {
+      $or: [{ isActive: { $ne: false } }, { isActive: { $exists: false } }],
+    };
+
+    const match: any = { ...activeMatch };
+
+    // ✅ فلترة النوع (لو مرّرته من الواجهة)
+    if (usageType) match.usageType = usageType;
+
+    // ✅ فئة: طابق في category المفرد و categories[] كـ ObjectId وكـ String
+    if (categoryId) {
+      const cidStr = String(categoryId);
+      const cidObj = mongoose.Types.ObjectId.isValid(cidStr)
+        ? new mongoose.Types.ObjectId(cidStr)
+        : null;
+
+      const orForCategory: any[] = [];
+      if (cidObj) {
+        orForCategory.push({ category: cidObj }, { categories: cidObj });
+      }
+      // دعم السجلات القديمة/المعطوبة التي خزّنت كسلسلة
+      orForCategory.push({ category: cidStr }, { categories: cidStr });
+
+      match.$and = [...(match.$and || []), { $or: orForCategory }];
+    }
+
+    // ⚠️ اللوج يجب أن يطبع نفس الشيء الذي سنستعلم به
     console.log(
       "[stores] DB:",
       mongoose.connection.db.databaseName,
-      "query:",
-      query
+      "match:",
+      JSON.stringify(match)
     );
 
-    // Filter by category if provided
-    if (categoryId && mongoose.Types.ObjectId.isValid(categoryId.toString())) {
-      filter.category = new mongoose.Types.ObjectId(categoryId.toString());
-    }
-
-    // Fetch stores
-    const stores = await DeliveryStore.find(filter)
-      .populate("category")
+    const stores = await DeliveryStore.find(match)
+      .populate("category") // ref: DeliveryCategory
       .sort({ createdAt: -1 })
       .lean();
+
     console.log("[stores] count:", stores.length);
 
-    // Enrich with computed isOpen
-    type StoreWithStatus = (typeof stores)[number] & { isOpen: boolean };
-    const enriched = stores.map<StoreWithStatus>((store) => {
-      const isOpen = computeIsOpen(
+    const enriched = stores.map((store) => ({
+      ...store,
+      isOpen: computeIsOpen(
         store.schedule,
         !!store.forceClosed,
         !!store.forceOpen
-      );
-      return {
-        ...store,
-        isOpen,
-      };
-    });
+      ),
+    }));
 
     res.json(enriched);
   } catch (error: any) {
@@ -180,8 +198,8 @@ export const update = async (req: Request, res: Response) => {
       delete body.lat;
       delete body.lng;
     }
-    if (req.user.role === "vendor") {
-      const vendor = await Vendor.findOne({ user: req.user.id });
+    if ((req as any).user?.role === "vendor") {
+      const vendor = await Vendor.findOne({ user: (req as any).user.id });
       if (!vendor) {
         res.status(403).json({ message: "ليس لديك حساب تاجر" });
         return;
@@ -529,8 +547,8 @@ export async function searchStores(req: Request, res: Response) {
 // Delete a delivery store
 export const remove = async (req: Request, res: Response) => {
   try {
-    if (req.user.role === "vendor") {
-      const vendor = await Vendor.findOne({ user: req.user.id });
+    if ((req as any).user?.role === "vendor") {
+      const vendor = await Vendor.findOne({ user: (req as any).user.id });
       if (!vendor) {
         res.status(403).json({ message: "ليس لديك حساب تاجر" });
         return;

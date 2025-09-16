@@ -3,7 +3,7 @@ import { Request, Response } from "express";
 import DeliveryCart from "../../models/delivery_marketplace_v1/DeliveryCart";
 import { User } from "../../models/user";
 // @ts-ignore
-import geolib from "geolib";
+import geolib, { getDistance } from "geolib";
 import DeliveryStore from "../../models/delivery_marketplace_v1/DeliveryStore";
 import PricingStrategy from "../../models/delivery_marketplace_v1/PricingStrategy";
 import { calculateDeliveryPrice } from "../../utils/deliveryPricing";
@@ -62,16 +62,15 @@ export const addOrUpdateCart = async (req: Request, res: Response) => {
         : v;
     };
 
-    // 4. معالجة المستخدم
-    let userObjId: mongoose.Types.ObjectId | undefined;
-    if (req.user?.id) {
-      const userDoc = await User.findOne({ firebaseUID: req.user.id }).exec();
-      if (!userDoc) {
-        res.status(404).json({ message: "المستخدم غير موجود" });
-        return;
-      }
-      userObjId = userDoc._id;
+    // 4. معالجة المستخدم - احصل على هوية المستخدم من Firebase UID أو من req.user.id
+    const uid = (req as any).firebaseUser?.uid || (req as any).user?.id || null;
+
+    let dbUser = null;
+    if (uid) {
+      dbUser = await User.findOne({ firebaseUID: uid }).select("_id");
     }
+
+    const userObjId = dbUser?._id;
 
     // 5. تحويل المعرفات لكل عنصر
     const itemsMapped = itemsArr
@@ -86,34 +85,33 @@ export const addOrUpdateCart = async (req: Request, res: Response) => {
       }))
       .filter((i) => i.productId && i.store);
 
-    // 6. البحث عن السلة الحالية
-    const filter: any = {};
-    if (cartId) filter.cartId = cartId;
-    if (userObjId) filter.user = userObjId;
+    // 6. البحث عن السلة الحالية أو إنشاؤها/تحديثها
+    const total = itemsMapped.reduce(
+      (sum, it) => sum + it.price * it.quantity,
+      0
+    );
 
     console.log("🟢 سيتم حفظ الكارت بالقيم التالية:");
     console.log("user:", userObjId);
     console.log("items:", itemsMapped);
 
-    let cart = await DeliveryCart.findOne(filter);
-
-    // 7. إنشاء أو تحديث السلة
-    if (!cart) {
-      const total = itemsMapped.reduce(
-        (sum, it) => sum + it.price * it.quantity,
-        0
-      );
-      cart = new DeliveryCart({
+    // استخدم findOneAndUpdate مع upsert لربط السلة بالمستخدم
+    const cartDoc = await DeliveryCart.findOneAndUpdate(
+      userObjId ? { user: userObjId } : { cartId }, // لو مستخدم مسجل خذه، وإلا cartId للضيف
+      {
+        user: userObjId, // اربطها بالمستخدم عند التسجيل
         cartId: cartId || new mongoose.Types.ObjectId().toString(),
-        user: userObjId,
         items: itemsMapped,
         total,
         note,
-      });
-    } else {
-      // تحديث السلة الحالية
+      },
+      { upsert: true, new: true }
+    );
+
+    // تحديث العناصر الموجودة إذا كانت السلة موجودة مسبقاً
+    if (cartDoc.items.length > 0) {
       for (const newItem of itemsMapped) {
-        const existingItemIndex = cart.items.findIndex(
+        const existingItemIndex = cartDoc.items.findIndex(
           (item) =>
             (item.productId?.toString() ?? "") ===
               (newItem.productId?.toString() ?? "") &&
@@ -121,23 +119,22 @@ export const addOrUpdateCart = async (req: Request, res: Response) => {
         );
 
         if (existingItemIndex !== -1) {
-          cart.items[existingItemIndex].quantity += newItem.quantity;
+          cartDoc.items[existingItemIndex].quantity += newItem.quantity;
         } else {
-          cart.items.push(newItem);
+          cartDoc.items.push(newItem);
         }
       }
 
       // إعادة حساب الإجمالي
-      cart.total = cart.items.reduce(
+      cartDoc.total = cartDoc.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0
       );
+      await cartDoc.save();
     }
-
-    await cart.save();
     res.status(201).json({
-      cart,
-      cartId: cart.cartId,
+      cart: cartDoc,
+      cartId: cartDoc.cartId,
     });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
@@ -146,98 +143,117 @@ export const addOrUpdateCart = async (req: Request, res: Response) => {
 
 export const updateCartItemQuantity = async (req: Request, res: Response) => {
   try {
-    const firebaseUID = req.user?.id;
+    const firebaseUID = (req as any).user?.id;
     if (!firebaseUID) {
       res.status(401).json({ message: "Unauthorized" });
       return;
     }
 
-    const { productId, productType } = req.params; // أضف productType في الراوت أو body
+    const productId = String(req.params.productId);
+    // خذ الـ productType من body أو query أو params (احتياطي) أو اجعله افتراضيًا
+    const productType = (req.body?.productType ||
+      req.query?.productType ||
+      (req.params as any)?.productType ||
+      "deliveryProduct") as string;
+
     const { quantity } = req.body;
     if (typeof quantity !== "number" || quantity < 1) {
       res.status(400).json({ message: "Quantity must be ≥ 1" });
       return;
     }
 
-    // إيجاد المستخدم
     const user = await User.findOne({ firebaseUID }).exec();
     if (!user) {
       res.status(404).json({ message: "User not found" });
       return;
     }
 
-    // إيجاد السلة
     const cart = await DeliveryCart.findOne({ user: user._id });
     if (!cart) {
       res.status(404).json({ message: "Cart not found" });
       return;
     }
-    cart.items.filter(
+
+    // ابحث أولاً بالمطابقة الكاملة (productId + productType)
+    let idx = cart.items.findIndex(
       (i) =>
-        !(
-          (i.productId?.toString() ?? "") === (productId ?? "") &&
-          i.productType === productType
-        )
+        (i.productId?.toString() ?? "") === productId &&
+        i.productType === productType
     );
 
-    // إيجاد العنصر وتعديله بناءً على النوع والمعرف
-    const idx = cart.items.findIndex(
-      (i) =>
-        i.productId.toString() === productId && i.productType === productType
-    );
+    // لو ما لقيته، جرّب مطابقة الـ productId فقط (احتياط)
+    if (idx === -1) {
+      idx = cart.items.findIndex(
+        (i) => (i.productId?.toString() ?? "") === productId
+      );
+    }
+
     if (idx === -1) {
       res.status(404).json({ message: "Item not found in cart" });
       return;
     }
 
-    // ضبط الكمية
     cart.items[idx].quantity = quantity;
 
-    // إعادة حساب الإجمالي
+    // أعد حساب الإجمالي
     cart.total = cart.items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
+      (sum, item) => sum + (Number(item.price) || 0) * (item.quantity || 0),
       0
     );
 
     await cart.save();
     res.json(cart);
-    return;
   } catch (err: any) {
     res.status(500).json({ message: err.message });
-    return;
   }
 };
 
+// controllers/.../DeliveryCartController.ts
 export const getCart = async (req: Request, res: Response) => {
   try {
-    const { cartId } = req.params;
-    let filter: any = {};
+    const { cartId, userId } = req.params as any;
+    const u = (req as any).user?.id; // firebase UID إن وُجد
+    const filter: any = {};
+
     if (cartId) {
       filter.cartId = cartId;
-    } else if (req.user?.id) {
-      const user = await User.findOne({ firebaseUID: req.user.id }).exec();
-      if (!user) {
+    } else if (userId) {
+      // userId كمونغو ObjectId
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        filter.user = new mongoose.Types.ObjectId(userId);
+      } else if (u) {
+        // fallback: لو أرسلت uid بالخطأ في مكان userId
+        const userDoc = await User.findOne({ firebaseUID: userId }).exec();
+        if (!userDoc) {
+          res.status(404).json({ message: "المستخدم غير موجود" });
+          return;
+        }
+        filter.user = userDoc._id;
+      } else {
+        res.status(400).json({ message: "userId غير صالح" });
+        return;
+      }
+    } else if (u) {
+      const userDoc = await User.findOne({ firebaseUID: u }).exec();
+      if (!userDoc) {
         res.status(404).json({ message: "المستخدم غير موجود" });
         return;
       }
-      filter.user = user._id; // الصحيح هنا user وليس userId
+      filter.user = userDoc._id;
     } else {
       res.status(400).json({ message: "cartId أو تسجيل الدخول مطلوب" });
       return;
     }
 
     const cart = await DeliveryCart.findOne(filter);
-
     if (!cart) {
       res.status(404).json({ message: "سلة فارغة" });
       return;
     }
 
     res.json(cart);
-    return;
   } catch (err: any) {
     res.status(500).json({ message: err.message });
-    return;
   }
 };
 
@@ -247,9 +263,11 @@ export const clearCart = async (req: Request, res: Response) => {
     let filter: any = {};
     if (req.params.cartId || req.body.cartId) {
       filter.cartId = req.params.cartId || req.body.cartId;
-    } else if (req.user?.id) {
+    } else if ((req as any).user?.id) {
       // المستخدم المسجّل
-      const user = await User.findOne({ firebaseUID: req.user.id }).exec();
+      const user = await User.findOne({
+        firebaseUID: (req as any).user.id,
+      }).exec();
       filter.user = user!._id; // الصحيح هنا user وليس userId
     } else {
       res.status(400).json({ message: "cartId أو تسجيل الدخول مطلوب" });
@@ -265,7 +283,9 @@ export const clearCart = async (req: Request, res: Response) => {
   }
 };
 export const mergeCart = async (req: Request, res: Response) => {
-  const userDoc = await User.findOne({ firebaseUID: req.user!.id }).exec();
+  const userDoc = await User.findOne({
+    firebaseUID: (req as any).user!.id,
+  }).exec();
   if (!userDoc) {
     res.status(404).json({ message: "User not found" });
     return;
@@ -314,56 +334,72 @@ export const getAbandonedCarts = async (_: Request, res: Response) => {
 };
 export const getDeliveryFee = async (req: Request, res: Response) => {
   try {
-    const firebaseUID = req.user.id;
-    const { addressId, deliveryMode = "split" } = req.query;
+    const { addressId, deliveryMode = "split", cartId } = req.query as any;
 
-    // تحميل المستخدم والعنوان
-    const user = await User.findOne({ firebaseUID });
-    const address = user.addresses.find((a) => a._id.toString() === addressId);
+    // 🟢 اقرأ هوية Firebase من المكان الصحيح
+    const uid = (req as any).firebaseUser?.uid || (req as any).user?.id || null;
+
+    const user = uid ? await User.findOne({ firebaseUID: uid }) : null;
+    if (!user) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    // العنوان
+    const address = user.addresses.find(
+      (a: any) => a._id.toString() === String(addressId)
+    );
     if (!address) {
       res.status(400).json({ message: "عنوان غير صالح" });
       return;
     }
-    if (!address) {
-      res.status(400).json({ message: "عنوان غير صالح" });
-      return;
-    }
 
-    // جلب محتوى السلة
-    const cart = await DeliveryCart.findOne({ user: user._id });
-    if (!cart) {
+    // السلة للمستخدم؛ وإن ما وجِدت جرّب ضيف cartId
+    let cart = await DeliveryCart.findOne({ user: user._id });
+    if (!cart && cartId) {
+      cart = await DeliveryCart.findOne({ cartId: String(cartId) });
+    }
+    if (!cart || !cart.items?.length) {
       res.status(400).json({ message: "السلة فارغة" });
       return;
     }
 
-    // جلب الاستراتيجية
     const strategy = await PricingStrategy.findOne({});
     if (!strategy) throw new Error("Pricing strategy not configured");
 
     let fee = 0;
-    if (deliveryMode === "unified") {
-      // استخدم أقرب متجر فقط
-      const storeId = cart.items[0].store;
-      const store = await DeliveryStore.findById(storeId);
-      const distKm =
-        geolib.getDistance(
-          { latitude: store.location.lat, longitude: store.location.lng },
-          { latitude: address.location.lat, longitude: address.location.lng }
-        ) / 1000;
-      fee = calculateDeliveryPrice(distKm, strategy);
-    } else {
-      // لكل متجر ضمن السلة
-      const grouped = cart.items.reduce((map, i) => {
-        const key = i.store.toString(); // ⇐ هنا
-        (map[key] = map[key] || []).push(i);
-        return map;
-      }, {} as Record<string, typeof cart.items>);
 
-      for (const storeId of Object.keys(grouped)) {
-        const store = await DeliveryStore.findById(storeId);
+    if (deliveryMode === "unified") {
+      // احسب أرخص تكلفة بين المتاجر الموجودة في السلة
+      let minFee = Infinity;
+      const distinctStores = [
+        ...new Set(cart.items.map((i) => String(i.store))),
+      ];
+      for (const sid of distinctStores) {
+        const s = await DeliveryStore.findById(sid);
+        if (!s?.location) continue;
         const distKm =
-          geolib.getDistance(
-            { latitude: store.location.lat, longitude: store.location.lng },
+          getDistance(
+            { latitude: s.location.lat, longitude: s.location.lng },
+            { latitude: address.location.lat, longitude: address.location.lng }
+          ) / 1000;
+        const f = calculateDeliveryPrice(distKm, strategy);
+        if (f < minFee) minFee = f;
+      }
+      fee = isFinite(minFee) ? minFee : 0;
+    } else {
+      // split: اجمع رسوم كل متجر على حدة
+      const grouped = cart.items.reduce((m: Record<string, any[]>, it: any) => {
+        const k = String(it.store);
+        (m[k] = m[k] || []).push(it);
+        return m;
+      }, {});
+      for (const sid of Object.keys(grouped)) {
+        const s = await DeliveryStore.findById(sid);
+        if (!s?.location) continue;
+        const distKm =
+          getDistance(
+            { latitude: s.location.lat, longitude: s.location.lng },
             { latitude: address.location.lat, longitude: address.location.lng }
           ) / 1000;
         fee += calculateDeliveryPrice(distKm, strategy);
@@ -371,12 +407,12 @@ export const getDeliveryFee = async (req: Request, res: Response) => {
     }
 
     res.json({
-      deliveryFee: fee,
-      cartTotal: cart.total,
-      grandTotal: cart.total + fee,
+      deliveryFee: Math.max(0, Math.round(fee)),
+      cartTotal: cart.total ?? 0,
+      grandTotal: (cart.total ?? 0) + (fee ?? 0),
     });
     return;
-  } catch (err) {
+  } catch (err: any) {
     res.status(500).json({ message: err.message });
     return;
   }
@@ -386,47 +422,64 @@ export const removeItem = async (
   req: Request<RemoveItemParams>,
   res: Response
 ) => {
-  const { cartId, userId, productId, productType } = {
-    ...req.params,
-    ...(req.params.userId && { userId: req.params.userId }),
-  };
+  try {
+    const { cartId, userId, productId } = req.params as any;
+    const productType =
+      (req.query?.productType as string) ||
+      (req.body?.productType as string) ||
+      "deliveryProduct";
 
-  let filter: any = {};
+    const filter: any = {};
 
-  // إذا يوجد userId، حوله أولاً إلى ObjectId الصحيح
-  if (userId) {
-    // إذا كان userId هو uid نصي وليس ObjectId
-    let userObjId: mongoose.Types.ObjectId;
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      // ابحث عن ObjectId من جدول المستخدمين
-      const userDoc = await User.findOne({ firebaseUID: userId });
-      if (!userDoc) {
-        res.status(404).json({ message: "المستخدم غير موجود" });
-        return;
+    if (userId) {
+      // إن كان userId ObjectId صالحًا -> استخدمه مباشرة
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        filter.user = new mongoose.Types.ObjectId(userId);
+      } else {
+        // افترض أنه Firebase UID -> حوّله إلى ObjectId المستخدم
+        const userDoc = await User.findOne({ firebaseUID: userId }).exec();
+        if (!userDoc) {
+          res.status(404).json({ message: "المستخدم غير موجود" });
+          return;
+        }
+        filter.user = userDoc._id;
       }
-      userObjId = userDoc._id;
+    } else if (cartId) {
+      filter.cartId = cartId;
+    } else {
+      res.status(400).json({ message: "userId أو cartId مطلوب" });
+      return;
     }
-    filter.user = userObjId;
-  } else if (cartId) {
-    filter.cartId = cartId;
-  } else {
-    res.status(400).json({ message: "userId أو cartId مطلوب" });
-    return;
-  }
 
-  const cart = await DeliveryCart.findOne(filter);
-  if (!cart) {
-    res.status(404).json({ message: "سلة غير موجودة" });
-    return;
+    const cart = await DeliveryCart.findOne(filter);
+    if (!cart) {
+      res.status(404).json({ message: "سلة غير موجودة" });
+      return;
+    }
+
+    // احذف بالمعرف والنوع (مع fallback لحذف بالمعرّف فقط إن لم يطابق النوع)
+    const before = cart.items.length;
+    cart.items = cart.items.filter(
+      (i) =>
+        !(
+          (i.productId?.toString() ?? "") === (productId ?? "") &&
+          (i.productType === productType || productType === "any")
+        )
+    );
+    if (cart.items.length === before) {
+      // احتياط: حاول حذف بالمُعرِّف فقط
+      cart.items = cart.items.filter(
+        (i) => (i.productId?.toString() ?? "") !== (productId ?? "")
+      );
+    }
+
+    cart.total = cart.items.reduce(
+      (sum, i) => sum + (Number(i.price) || 0) * (i.quantity || 0),
+      0
+    );
+    await cart.save();
+    res.json(cart);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
   }
-  cart.items.filter(
-    (i) =>
-      !(
-        (i.productId?.toString() ?? "") === (productId ?? "") &&
-        i.productType === productType
-      )
-  );
-  cart.total = cart.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  await cart.save();
-  res.json(cart);
 };

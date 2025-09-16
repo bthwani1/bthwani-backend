@@ -4,7 +4,7 @@ import { verifyFirebase } from "../middleware/verifyFirebase";
 
 const r = Router();
 
-r.get("/support/tickets/my", verifyFirebase, async (req: any, res) => {
+r.get("/tickets/my", verifyFirebase, async (req: any, res) => {
   const uid = req.user.uid;
   const list = await SupportTicket.find({ userId: uid }).sort({
     updatedAt: -1,
@@ -12,7 +12,7 @@ r.get("/support/tickets/my", verifyFirebase, async (req: any, res) => {
   res.json(list);
 });
 
-r.post("/support/tickets", verifyFirebase, async (req: any, res) => {
+r.post("/tickets", verifyFirebase, async (req: any, res) => {
   const uid = req.user.uid;
   const { subject, message } = req.body;
   const t = await SupportTicket.create({
@@ -23,12 +23,12 @@ r.post("/support/tickets", verifyFirebase, async (req: any, res) => {
   res.status(201).json(t);
 });
 
-r.get("/support/tickets/:id/messages", verifyFirebase, async (req, res) => {
+r.get("/tickets/:id/messages", verifyFirebase, async (req, res) => {
   const t = await SupportTicket.findById(req.params.id);
   res.json(t?.messages || []);
 });
 
-r.post("/support/tickets/:id/messages", verifyFirebase, async (req, res) => {
+r.post("/tickets/:id/messages", verifyFirebase, async (req, res) => {
   const t = await SupportTicket.findById(req.params.id);
   if (!t) {
     res.status(404).json({ message: "Not found" });

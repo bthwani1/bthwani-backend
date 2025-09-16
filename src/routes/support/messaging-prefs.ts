@@ -1,7 +1,6 @@
 // routes/messaging-prefs.ts
 import { Router } from "express";
 import { z } from "zod";
-import { validate2 } from "../../middleware/validate";
 import MessagingPrefs from "../../models/support/MessagingPrefs";
 const r = Router();
 
@@ -39,7 +38,7 @@ const PatchSchema = z.object({
     caps: z.object({ perDay: z.number().int().min(0).optional() }).optional(),
   }),
 });
-r.patch("/me", validate2(PatchSchema), async (req: any, res) => {
+r.patch("/me", async (req: any, res) => {
   const userId = req.user?.id;
   if (!userId) {
     res.status(401).json({ message: "Unauthorized" });

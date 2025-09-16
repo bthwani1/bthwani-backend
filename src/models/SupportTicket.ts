@@ -1,4 +1,5 @@
-import { Schema, model, Types } from "mongoose";
+// models/SupportTicket.ts
+import { Schema, model } from "mongoose";
 
 const Msg = new Schema(
   {
@@ -13,7 +14,7 @@ export default model(
   "SupportTicket",
   new Schema(
     {
-      userId: { type: Types.ObjectId, ref: "User", index: true },
+      userId: { type: String, index: true }, // <-- كان ObjectId: غيّرناه إلى String
       subject: String,
       status: { type: String, enum: ["open", "closed"], default: "open" },
       messages: [Msg],
@@ -21,4 +22,3 @@ export default model(
     { timestamps: true }
   )
 );
-

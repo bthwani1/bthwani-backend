@@ -9,8 +9,9 @@ console.log("[ROUTE] DeliveryStores (IN-USE) from", __filename);
 
 // عامة
 router.get("/", controller.getAll);
-router.get("/:id", controller.getById);
 router.get("/search", controller.searchStores);
+
+router.get("/:id", controller.getById);
 
 // أدمن فقط
 const adminOnly = [verifyFirebase, verifyAdmin];

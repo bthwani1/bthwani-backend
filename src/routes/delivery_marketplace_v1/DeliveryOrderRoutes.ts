@@ -96,6 +96,7 @@ const router = express.Router();
  *         description: Server error while creating order.
  */
 router.post("/", verifyFirebase, controller.createOrder);
+router.post("/errand", verifyFirebase, createErrandOrder);
 
 /**
  * @swagger
@@ -143,7 +144,7 @@ router.get(
   async (req: Request, res: Response) => {
     try {
       // 1. جلب التاجر الحالي من خلال التوكن
-      const vendor = await Vendor.findById(req.user.id).lean();
+      const vendor = await Vendor.findById((req as any).user.id).lean();
       if (!vendor) {
         res.status(404).json({ message: "التاجر غير موجود" });
         return;
@@ -225,9 +226,7 @@ router.get(
   }
 );
 
-router.post("/errand", verifyFirebase, createErrandOrder);
-
-router.get("/fee", getDeliveryFee);
+router.get("/fee", verifyFirebase, getDeliveryFee); // ← أضف verifyFirebase هنا
 
 /**
  * @swagger

@@ -6,15 +6,13 @@ import DeliveryOrder from "../../models/delivery_marketplace_v1/Order";
 import { User } from "../../models/user";
 import PricingStrategy from "../../models/delivery_marketplace_v1/PricingStrategy";
 import { calculateDeliveryPrice } from "../../utils/deliveryPricing";
-// @ts-ignore
-import io from "../.."; // أو المكان الصحيح للـ io لديك
 
 export const createErrandOrder = async (req: Request, res: Response) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
     // 1) تحقق المستخدم
-    const firebaseUID = (req as any).firebaseUser?.uid || req.user?.id;
+    const firebaseUID = (req as any).user?.id;
     if (!firebaseUID) {
       res.status(401).json({ message: "Unauthorized" });
       return;
