@@ -1,6 +1,5 @@
 // routes/admin/drivers.assets.ts
 import { Router } from "express";
-import { z } from "zod";
 
 import DriverAsset from "../../models/Driver_app/DriverAsset";
 import DriverAssetAssignment from "../../models/Driver_app/DriverAssetAssignment";
