@@ -217,7 +217,7 @@ r.post("/tickets/:id/csat", validate2(CsatSchema), async (req, res) => {
 // (MVP) تقارير مختصرة
 r.get(
   "/reports/summary",
-  requireRole("support:report", "support:read"),
+  requireRole(["support:report", "support:read"]),
   async (req, res) => {
     const from = (req.query.from as string) || new Date(0).toISOString();
     const to = (req.query.to as string) || new Date().toISOString();
@@ -363,15 +363,19 @@ r.post("/sla-policies", requireRole("support:manage"), async (req, res) => {
   res.json(await SlaPolicy.create(req.body));
 });
 
-r.patch("/sla-policies/:id", requireRole("support:manage"), async (req, res) => {
-  res.json(
-    await SlaPolicy.findByIdAndUpdate(
-      req.params.id,
-      { $set: req.body },
-      { new: true }
-    )
-  );
-});
+r.patch(
+  "/sla-policies/:id",
+  requireRole("support:manage"),
+  async (req, res) => {
+    res.json(
+      await SlaPolicy.findByIdAndUpdate(
+        req.params.id,
+        { $set: req.body },
+        { new: true }
+      )
+    );
+  }
+);
 
 r.delete(
   "/sla-policies/:id",
