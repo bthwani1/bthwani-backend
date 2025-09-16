@@ -13,7 +13,7 @@
     "noEmitOnError": false,
 
     // ✳️ هنا: اجعل typeRoots يشمل مجلد التعريفات داخل src
-    "typeRoots": ["./src/types", "./node_modules/@types"],
+    // "typeRoots": ["./src/types", "./node_modules/@types"]
 
     "outDir": "./dist",
     "rootDir": "./src"

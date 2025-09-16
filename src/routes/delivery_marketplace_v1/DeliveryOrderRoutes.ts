@@ -124,7 +124,7 @@ router.post("/errand", verifyFirebase, createErrandOrder);
  *         description: Server error while fetching vendor orders.
  */
 router.delete("/orders/:id", verifyFirebase, controller.cancelOrder);
-router.put(":id/vendor-accept", authVendor, controller.vendorAcceptOrder);
+router.put("/:id/vendor-accept", authVendor, controller.vendorAcceptOrder);
 router.post("/:id/rate", verifyFirebase, rateOrder);
 router.get("/export/orders/excel", controller.exportOrdersToExcel);
 router.get("/me", verifyFirebase, controller.getUserOrders);
@@ -417,6 +417,6 @@ router.get("/:id/notes", verifyFirebase, verifyAdmin, controller.getOrderNotes);
  *       500:
  *         description: Server error while updating order.
  */
-router.put(":id/status", verifyFirebase, controller.updateOrderStatus);
+router.put("/:id/status", verifyFirebase, controller.updateOrderStatus);
 
 export default router;
