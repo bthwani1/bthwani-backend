@@ -125,6 +125,7 @@ router.post("/errand", verifyFirebase, createErrandOrder);
  */
 router.delete("/orders/:id", verifyFirebase, controller.cancelOrder);
 router.put("/:id/vendor-accept", authVendor, controller.vendorAcceptOrder);
+router.put("/:id/vendor-cancel", authVendor, controller.vendorCancelOrder);
 router.post("/:id/rate", verifyFirebase, rateOrder);
 router.get("/export/orders/excel", controller.exportOrdersToExcel);
 router.get("/me", verifyFirebase, controller.getUserOrders);
@@ -144,7 +145,7 @@ router.get(
   async (req: Request, res: Response) => {
     try {
       // 1. جلب التاجر الحالي من خلال التوكن
-      const vendor = await Vendor.findById((req as any).user.id).lean();
+      const vendor = await Vendor.findById(req.user!.vendorId).lean();
       if (!vendor) {
         res.status(404).json({ message: "التاجر غير موجود" });
         return;

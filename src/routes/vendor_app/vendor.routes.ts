@@ -20,23 +20,23 @@ router.get(
   controller.listVendors
 );
 // جلب بيانات التاجر (vendor نفسه)
-router.get("/vendor/me", controller.getMyProfile);
+router.get("/me", controller.getMyProfile);
 
 router.post("/auth/vendor-login", controller.vendorLogin);
 
 // تعديل بيانات التاجر (fullName, phone, إلخ)
 router.put(
-  "/vendor/me",
+  "/me",
   // تحقق من صحة الحقول هنا
   controller.updateMyProfile
 );
 router.post("/", verifyFirebase, verifyAdmin, addVendor);
 // إضافة متجر جديد (مثلاً يربط vendor بمتجر)
 // body: { storeId: ObjectId }
-router.post("/vendor/stores", controller.attachStoreToVendor);
+router.post("/stores", controller.attachStoreToVendor);
 
 // حذف الربط أو تعطيل المتجر الخاص بالتاجر
-router.delete("/vendor/stores/:storeId", controller.detachStoreFromVendor);
+router.delete("/stores/:storeId", controller.detachStoreFromVendor);
 router.get("/merchant/reports", verifyFirebase, controller.getMerchantReports);
 router.post("/push-token", async (req, res) => {
   const { vendorId, expoPushToken } = req.body;
@@ -50,7 +50,7 @@ router.get(
   async (req: Request, res: Response) => {
     try {
       // احصل على المتجر الخاص بالتاجر من التوكن
-      const vendor = await Vendor.findById(req.user.id).lean();
+      const vendor = await Vendor.findById(req.user.vendorId).lean();
       if (!vendor || !vendor.store) {
         res.status(404).json({ message: "لا يوجد متجر مرتبط بهذا التاجر" });
         return;

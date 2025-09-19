@@ -4,7 +4,7 @@ import DeliveryOrder, {
 } from "../../models/delivery_marketplace_v1/Order";
 import DeliveryCart from "../../models/delivery_marketplace_v1/DeliveryCart";
 import { User } from "../../models/user";
-import mongoose, { Types } from "mongoose";
+import mongoose, { ClientSession, Types } from "mongoose";
 import DeliveryStore from "../../models/delivery_marketplace_v1/DeliveryStore";
 import Driver from "../../models/Driver_app/driver";
 import { calculateDeliveryPrice } from "../../utils/deliveryPricing";
@@ -27,6 +27,7 @@ import {
 } from "../../services/walletOrder.service";
 import { Coupon } from "../../models/Wallet_V8/coupon.model";
 import { captureForOrder } from "../../services/holds";
+import Vendor from "../../models/vendor_app/Vendor";
 // 👇 ضِف أعلى هذا الملف
 
 type In = {
@@ -204,7 +205,7 @@ export const createOrder = async (req: Request, res: Response) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    // 1) التحقق من المستخدم (اعتمدنا توحيدًا على req.user!.id)
+    // 1) التحقق من المستخدم
     const firebaseUID = (req as any).user?.id;
     if (!firebaseUID) {
       res.status(401).json({ message: "Unauthorized" });
@@ -216,21 +217,19 @@ export const createOrder = async (req: Request, res: Response) => {
     const orderId = new mongoose.Types.ObjectId();
 
     // 2) السلة
-    const cart = await DeliveryCart.findOne({ user: user._id }).session(
-      session
-    );
+    const cart = await DeliveryCart.findOne({ user: user._id }).session(session);
     if (!cart || cart.items.length === 0) throw new Error("السلة فارغة");
 
-    // 3) بيانات الادخال
+    // 3) بيانات الإدخال
     let {
       scheduledFor,
       addressId,
       notes,
       paymentMethod,
       deliveryMode = "split",
-      couponCode, // يمكن أن يأتي باسم couponCode
-      coupon, // أو coupon
-      errand, // بيانات الطلب من نوع errand
+      couponCode,
+      coupon,        // alias
+      errand,        // بيانات طلب المشاوير
     } = req.body;
 
     // alias: cod -> cash
@@ -240,39 +239,93 @@ export const createOrder = async (req: Request, res: Response) => {
       throw new Error("الوقت المجدوَل يجب أن يكون في المستقبل.");
     }
 
-    // 4) عنوان التوصيل
+    // 4) العنوان
     const targetId = addressId || user.defaultAddressId?.toString();
-    const chosenAddress = user.addresses.find(
-      (a) => a._id.toString() === targetId
-    );
-    if (!chosenAddress || !chosenAddress.location)
-      throw new Error("العنوان غير صالح");
+    const chosenAddress = user.addresses.find((a: any) => a._id.toString() === targetId);
+    if (!chosenAddress || !chosenAddress.location) throw new Error("العنوان غير صالح");
 
-    // 5) تجميع العناصر حسب المتجر
-    const grouped: Record<string, typeof cart.items> = {};
-    for (const item of cart.items) {
-      const key = item.store.toString();
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(item);
+    // 5) تطبيع عناصر السلة والتأكد من وجود store لكل عنصر
+    type CartItemLike = {
+      productId: any;
+      productType: "merchantProduct" | "deliveryProduct";
+      store?: any;
+      quantity: number;
+      price?: number;
+    };
+
+    const ensureStoreId = async (
+      it: CartItemLike,
+      session: ClientSession
+    ): Promise<Types.ObjectId | undefined> => {
+      if (it.store) return new Types.ObjectId(String(it.store));
+
+      if (it.productType === "merchantProduct") {
+        const mp = await MerchantProduct.findById(it.productId)
+          .select<Pick<{ store: Types.ObjectId }, "store">>("store")
+          .lean()
+          .session(session);
+        return mp?.store;
+      }
+
+      if (it.productType === "deliveryProduct") {
+        const dp = await DeliveryProduct.findById(it.productId)
+          .select<Pick<{ store: Types.ObjectId }, "store">>("store")
+          .lean()
+          .session(session);
+        return dp?.store;
+      }
+
+      return undefined;
+    };
+
+    const normalizedItems: CartItemLike[] = [];
+    for (const raw of cart.items as any[]) {
+      const storeId = await ensureStoreId(
+        {
+          productId: raw.productId,
+          productType: (raw.productType as any) || "deliveryProduct",
+          store: raw.store,
+          quantity: raw.quantity,
+          price: raw.price,
+        },
+        session
+      );
+      if (!storeId && !errand) {
+        // ليس Errand ولا عرفنا المتجر ⇒ عنصر غير صالح لسوق المتاجر
+        throw new Error("عنصر في السلة بدون متجر مرتبط");
+      }
+      normalizedItems.push({
+        ...raw,
+        productType: (raw.productType as any) || "deliveryProduct",
+        store: storeId || undefined,
+      });
     }
 
-    // 6) استراتيجية التسعير
+    // 6) تجميع العناصر حسب المتجر (لعقود marketplace فقط)
+    const grouped: Record<string, typeof normalizedItems> = {};
+    for (const item of normalizedItems) {
+      if (!item.store) continue; // عناصر الـ errand لا تُجمع هنا
+      const key = String(item.store);
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(item as any);
+    }
+    const stores = Object.keys(grouped);
+
+    // 7) استراتيجية التسعير
     const strategy = await PricingStrategy.findOne({}).session(session);
     if (!strategy) throw new Error("استراتيجية التسعير غير مكوَّنة");
 
-    // 7) رسوم التوصيل
+    // 8) رسوم التوصيل
     let deliveryFee = 0;
-    const stores = Object.keys(grouped);
     if (deliveryMode === "unified") {
-      const s = await DeliveryStore.findById(stores[0]).session(session);
-      if (!s) throw new Error("المتجر غير موجود");
+      const s = stores[0] ? await DeliveryStore.findById(stores[0]).session(session) : null;
+      if (!s && !errand) throw new Error("المتجر غير موجود");
+      const originLat = errand ? errand.pickup?.location?.lat : s!.location.lat;
+      const originLng = errand ? errand.pickup?.location?.lng : s!.location.lng;
       const distKm =
         getDistance(
-          { latitude: s.location.lat, longitude: s.location.lng },
-          {
-            latitude: chosenAddress.location.lat,
-            longitude: chosenAddress.location.lng,
-          }
+          { latitude: originLat, longitude: originLng },
+          { latitude: chosenAddress.location.lat, longitude: chosenAddress.location.lng }
         ) / 1000;
       deliveryFee = calculateDeliveryPrice(distKm, strategy);
     } else {
@@ -282,24 +335,21 @@ export const createOrder = async (req: Request, res: Response) => {
         const distKm =
           getDistance(
             { latitude: s.location.lat, longitude: s.location.lng },
-            {
-              latitude: chosenAddress.location.lat,
-              longitude: chosenAddress.location.lng,
-            }
+            { latitude: chosenAddress.location.lat, longitude: chosenAddress.location.lng }
           ) / 1000;
         deliveryFee += calculateDeliveryPrice(distKm, strategy);
       }
     }
 
-    // 8) العروض الفاعلة
+    // 9) العروض الفاعلة
     const promos = await fetchActivePromotions({
       city: chosenAddress.city,
       channel: "app",
     });
 
-    // 9) subOrders + إعادة تسعير العناصر
+    // 10) بناء subOrders + إعادة تسعير العناصر مع العروض
     let commonDriver: any = null;
-    if (deliveryMode === "unified") {
+    if (deliveryMode === "unified" && stores[0]) {
       const origin = await DeliveryStore.findById(stores[0]).session(session);
       if (origin) {
         commonDriver = await mongoose
@@ -353,7 +403,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
           pricedItems.push({
             product: i.productId,
-            productType: priced.resolvedType, // ← استخدم النوع الفعلي
+            productType: priced.resolvedType,
             quantity: i.quantity,
             unitPrice: priced.unitPriceFinal,
             unitPriceOriginal: priced.unitPriceOriginal,
@@ -392,7 +442,7 @@ export const createOrder = async (req: Request, res: Response) => {
       })
     );
 
-    // 10) الحصص
+    // 11) الحصص
     let totalCompanyShare = 0;
     let totalPlatformShare = 0;
     for (const so of subOrders) {
@@ -408,32 +458,28 @@ export const createOrder = async (req: Request, res: Response) => {
       totalPlatformShare += subTotal - companyShare;
     }
 
-    // 11) إجمالي السلع
+    // 12) إجمالي السلع
     let itemsTotal = subOrders.reduce(
       (sum: number, so: any) =>
-        sum +
-        so.items.reduce(
-          (s: number, it: any) => s + it.quantity * it.unitPrice,
-          0
-        ),
+        sum + so.items.reduce((s: number, it: any) => s + it.quantity * it.unitPrice, 0),
       0
     );
 
-    // 12) تطبيق الكوبون (اختياري)
+    // 13) تطبيق الكوبون (اختياري)
     const incomingCouponCode = (couponCode || coupon || "").toString().trim();
-    let couponApplied: null | {
-      code: string;
-      type: "percentage" | "fixed" | "free_shipping";
-      value: number;
-      discountOnItems: number;
-      discountOnDelivery: number;
-      appliedAt: Date;
-    } = null;
+    let couponApplied:
+      | null
+      | {
+          code: string;
+          type: "percentage" | "fixed" | "free_shipping";
+          value: number;
+          discountOnItems: number;
+          discountOnDelivery: number;
+          appliedAt: Date;
+        } = null;
 
     if (incomingCouponCode) {
-      const c = await Coupon.findOne({ code: incomingCouponCode }).session(
-        session
-      );
+      const c = await Coupon.findOne({ code: incomingCouponCode }).session(session);
       if (!c) throw new Error("الكوبون غير موجود");
       if (c.expiryDate < new Date()) throw new Error("انتهت صلاحية الكوبون");
       if (c.assignedTo && String(c.assignedTo) !== String(user._id)) {
@@ -472,83 +518,68 @@ export const createOrder = async (req: Request, res: Response) => {
       await c.save({ session });
     }
 
-    // 13) الإجمالي النهائي
+    // 14) الإجمالي النهائي
     const totalPrice = itemsTotal + deliveryFee;
 
-    // 14) أثر العروض المطبَّق على مستوى الطلب (اختياري)
+    // 15) أثر العروض على مستوى الطلب (اختياري)
     const appliedPromotions: any[] = [];
     for (const so of subOrders) {
-      if (Array.isArray(so.subAppliedPromos))
-        appliedPromotions.push(...so.subAppliedPromos);
+      if (Array.isArray(so.subAppliedPromos)) appliedPromotions.push(...so.subAppliedPromos);
     }
 
-    // 15) محفظة/كاش (حجز وليس خصم)
+    // 16) محفظة/كاش (حجز وليس خصم)
     const wallet = {
       balance: Number((user as any).wallet?.balance ?? 0),
       onHold: Number((user as any).wallet?.onHold ?? 0),
     };
 
     let walletUsed = 0;
-
-    // استخدم المحفظة فقط مع wallet أو mixed
     if (paymentMethod === "wallet" || paymentMethod === "mixed") {
       const available = Math.max(0, wallet.balance - wallet.onHold);
       walletUsed = Math.min(available, totalPrice);
-    } else {
-      walletUsed = 0; // cash / card
     }
 
     const cashDue = +(totalPrice - walletUsed).toFixed(2);
 
     if (walletUsed > 0) {
-      await holdForOrder(
-        String(user._id),
-        String(orderId),
-        walletUsed,
-        session
-      );
+      await holdForOrder(String(user._id), String(orderId), walletUsed, session);
     }
 
     let finalPaymentMethod: "wallet" | "cash" | "card" | "mixed" = "cash";
     if (walletUsed > 0 && cashDue > 0) finalPaymentMethod = "mixed";
     else if (walletUsed > 0 && cashDue === 0) finalPaymentMethod = "wallet";
 
-    // معالجة بيانات errand مع geo (إن وُجدت)
-    let errandData = undefined;
+    // 17) معالجة errand (إن وجدت) مع geo
+    let errandData = undefined as any;
     if (errand) {
       const pickupGeo = errand?.pickup?.location
         ? {
             type: "Point" as const,
-            coordinates: [
-              errand.pickup.location.lng,
-              errand.pickup.location.lat,
-            ] as [number, number],
+            coordinates: [errand.pickup.location.lng, errand.pickup.location.lat] as [
+              number,
+              number
+            ],
           }
         : undefined;
 
       const dropoffGeo = errand?.dropoff?.location
         ? {
             type: "Point" as const,
-            coordinates: [
-              errand.dropoff.location.lng,
-              errand.dropoff.location.lat,
-            ] as [number, number],
+            coordinates: [errand.dropoff.location.lng, errand.dropoff.location.lat] as [
+              number,
+              number
+            ],
           }
         : undefined;
 
       errandData = {
         ...errand,
-        pickup: {
-          ...errand.pickup,
-          geo: pickupGeo ?? undefined, // لا تنشئ geo إن ما فيه إحداثيات
-        },
-        dropoff: {
-          ...errand.dropoff,
-          geo: dropoffGeo ?? undefined,
-        },
+        pickup: { ...errand.pickup, geo: pickupGeo ?? undefined },
+        dropoff: { ...errand.dropoff, geo: dropoffGeo ?? undefined },
       };
     }
 
+    // 18) إنشاء الطلب
     const order = new DeliveryOrder({
       _id: orderId,
       user: user._id,
@@ -573,9 +604,9 @@ export const createOrder = async (req: Request, res: Response) => {
       cashDue,
       paymentMethod: finalPaymentMethod,
       status: "pending_confirmation",
-      paid: cashDue === 0, // ✅ إصلاح
+      paid: cashDue === 0,
       appliedPromotions,
-      coupon: couponApplied || undefined, // ✅ خزّن أثر الكوبون
+      coupon: couponApplied || undefined,
       pricesFrozenAt: new Date(),
       notes: sanitizeNotes(notes),
       orderType: errand ? "errand" : "marketplace",
@@ -947,96 +978,115 @@ export const setSubOrderPOD = async (req: Request, res: Response) => {
 
 // PUT /orders/:id/vendor-accept
 export const vendorAcceptOrder = async (req: Request, res: Response) => {
-  const order = await DeliveryOrder.findById(req.params.id)
-    .populate({ path: "user", select: "fullName phone" })
-    .populate({ path: "driver", select: "fullName phone" })
-    .populate({ path: "subOrders.store", select: "name logo address" })
-    .populate({ path: "subOrders.driver", select: "fullName phone" });
-  if (!order) {
-    res.status(404).json({ message: "Order not found" });
-    return;
-  }
+  try {
+    // 1) تحقق هوية التاجر والمتجر
+    const vendor = await Vendor.findById(req.user!.vendorId).lean();
+    if (!vendor) {
+      res.status(403).json({ message: "Vendor not found" });
+      return;
+    }
+    const storeId = vendor.store as Types.ObjectId;
 
-  if (!canTransition(order.status, "preparing")) {
-    res.status(400).json({
-      message: `Invalid transition from ${order.status} to preparing`,
-    });
-    return;
-  }
+    // 2) اجلب الطلب وتأكد أن له subOrder يخص متجر التاجر
+    const order = await DeliveryOrder.findById(req.params.id)
+      .populate({ path: "subOrders.store", select: "name logo address location" })
+      .populate({ path: "subOrders.driver", select: "fullName phone" })
+      .populate({ path: "user", select: "fullName phone" })
+      .populate({ path: "driver", select: "fullName phone" });
 
-  // ✅ اسناد سائق
-  if (order.deliveryMode === "unified") {
-    const store = await DeliveryStore.findById(order.subOrders[0].store);
-    if (!store) {
-      res.status(404).json({ message: "Store not found" });
+    if (!order) {
+      res.status(404).json({ message: "Order not found" });
       return;
     }
 
-    const driver = await Driver.findOne({
-      isAvailable: true,
-      isBanned: false,
-      $or: [
-        { isJoker: false },
-        {
-          isJoker: true,
-          jokerFrom: { $lte: new Date() },
-          jokerTo: { $gte: new Date() },
-        },
-      ],
-      currentLocation: {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [store.location.lng, store.location.lat],
-          },
-          $maxDistance: 5000,
-        },
-      },
-    });
-
-    if (!driver) {
-      res.status(400).json({ message: "No available driver nearby" });
+    const sub = order.subOrders.find(
+      s => String(s.store) === String(storeId) || String((s as any).store?._id) === String(storeId)
+    );
+    if (!sub) {
+      res.status(403).json({ message: "This order is not for your store" });
       return;
     }
 
-    order.driver = driver._id as Types.ObjectId; // 👈 اسناد فعلي
-    if (!order.assignedAt) order.assignedAt = new Date();
-  } else {
-    // split: اسناد لكل subOrder
-    for (const sub of order.subOrders) {
-      if (sub.driver) continue;
-      const s = await DeliveryStore.findById(sub.store);
-      if (!s) continue;
-
-      const drv = await Driver.findOne({
-        isAvailable: true,
-        isBanned: false,
-        currentLocation: {
-          $near: {
-            $geometry: {
-              type: "Point",
-              coordinates: [s.location.lng, s.location.lat],
-            },
-            $maxDistance: 5000,
-          },
-        },
+    // 3) تحقّق الانتقال لحالة preparing بالنسبة للـ subOrder والطلب
+    // إن كان لديك canTransition خاص بالـ order فقط، اسمح هنا على الأقل من:
+    // pending_confirmation | under_review -> preparing
+    const allowedFrom = ["pending_confirmation", "under_review", "assigned"];
+    const current = sub.status || order.status;
+    if (!allowedFrom.includes(current)) {
+      res.status(400).json({
+        message: `Invalid transition for this store: ${current} -> preparing`,
       });
-      if (drv) sub.driver = drv._id as Types.ObjectId; // 👈 اسناد السائق للـ subOrder
+      return;
     }
-    if (!order.assignedAt) order.assignedAt = new Date();
+
+    // 4) محاولة إسناد سائق (اختياري — لا تفشل إذا لم يوجد)
+    try {
+      const storeDoc: any =
+        (sub as any).store && (sub as any).store.location
+          ? (sub as any).store
+          : await DeliveryStore.findById(sub.store);
+
+      if (storeDoc?.location?.lng != null && storeDoc?.location?.lat != null) {
+        const drv = await Driver.findOne({
+          isAvailable: true,
+          isBanned: false,
+          $or: [
+            { isJoker: false },
+            { isJoker: true, jokerFrom: { $lte: new Date() }, jokerTo: { $gte: new Date() } },
+          ],
+          location: {
+            $near: {
+              $geometry: { type: "Point", coordinates: [storeDoc.location.lng, storeDoc.location.lat] }, // [lng, lat]
+              $maxDistance: 5000,
+            },
+          },
+        });
+
+        if (drv) {
+          // unified: اسناد على مستوى الطلب، split: على مستوى sub
+          if (order.deliveryMode === "unified") {
+            order.driver = drv._id as Types.ObjectId;
+          } else {
+            sub.driver = drv._id as Types.ObjectId;
+          }
+          if (!order.assignedAt) order.assignedAt = new Date();
+        }
+        // إن لم نجد سائقًا: لا تفشل — ابدأ التحضير بدون سائق
+      }
+    } catch (e) {
+      // لا تفشل القبول بسبب الإسناد — فقط سجل
+      console.warn("Driver assignment skipped:", (e as Error).message);
+    }
+
+    // 5) حدّث حالة subOrder لهذا المتجر إلى preparing
+    sub.status = "preparing";
+    (sub.statusHistory as any[]).push({
+      status: "preparing",
+      changedAt: new Date(),
+      changedBy: "store",
+    });
+
+    // 6) (اختياري) مزامنة حالة الطلب الكلية: اجعلها على الأقل "preparing"
+    // إذا أردت أن تعكس أدنى حالة بين الـ subOrders، أو لو جميعها preparing
+    // هنا سنرفع order.status إلى preparing إن لم تكن أعلى:
+    const orderAllowedFrom = ["pending_confirmation", "under_review"];
+    if (orderAllowedFrom.includes(order.status)) {
+      order.status = "preparing";
+      (order.statusHistory as any[]).push({
+        status: "preparing",
+        changedAt: new Date(),
+        changedBy: "store",
+      });
+    }
+
+    await notifyOrder("order.preparing", order); // لو عندك إشعار
+    await order.save({ validateModifiedOnly: true });
+
+    res.json(order);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
   }
-
-  // الحالة: المتجر بدأ التحضير
-  pushStatusHistory(order, "preparing", "store");
-  await notifyOrder("order.preparing", order);
-
-  // ⚠️ لو عندك مشكلة موروثة في notes:
-  // order.notes = sanitizeNotes(order.notes);
-  await order.save({ validateModifiedOnly: true });
-
-  res.json(order);
 };
-
 export const exportOrdersToExcel = async (req, res: Response) => {
   try {
     const ExcelJS = require("exceljs");
@@ -1243,6 +1293,139 @@ export const cancelOrder = async (req: Request, res: Response) => {
     res.status(500).json({ message: err.message });
   }
 };
+export const vendorCancelOrder = async (req: Request, res: Response) => {
+  try {
+    const reason: string | undefined = (req.body?.reason || "").toString().trim() || "Cancelled by store";
+
+    // 1) المتجر الحالي
+    const vendor = await Vendor.findById(req.user!.vendorId).lean();
+    if (!vendor) {
+      res.status(403).json({ message: "Vendor not found" });
+      return;
+    }
+    const storeId = vendor.store as Types.ObjectId;
+
+    // 2) اجلب الطلب (مهم: لا تـ populate `user` قبل استخراج الـ id)
+    const order = await DeliveryOrder.findById(req.params.id);
+    if (!order) {
+      res.status(404).json({ message: "Order not found" });
+      return;
+    }
+
+    // 🔒 امنع تلاعب المتاجر غير المعنية
+    const hasThisStore = order.subOrders.some(
+      (s: any) => String(s.store) === String(storeId)
+    );
+    if (!hasThisStore) {
+      res.status(403).json({ message: "This order is not associated with your store" });
+      return;
+    }
+
+    // 3) انتقاء subOrder الخاص بالمتجر
+    const sub = order.subOrders.find(
+      (s: any) => String(s.store) === String(storeId)
+    ) as any;
+
+    // 4) تحقق الانتقال
+    const current = sub.status || order.status;
+    const allowedFrom = ["pending_confirmation", "under_review", "preparing"];
+    if (!allowedFrom.includes(current)) {
+      res.status(400).json({ message: `Invalid transition for this store: ${current} -> cancelled` });
+      return;
+    }
+
+    // 5) إصلاح بيانات تالفة محتملة في notes قبل الحفظ
+    if (order.notes && !Array.isArray(order.notes)) {
+      // لو كانت سلسلة "" أو أي قيمة خاطئة — حوّلها لمصفوفة فارغة
+      (order as any).notes = [];
+      order.markModified("notes");
+    }
+
+    // 6) ألغِ الـ subOrder الخاص بمتجرك
+    sub.status = "cancelled";
+    sub.statusHistory.push({
+      status: "cancelled",
+      changedAt: new Date(),
+      changedBy: "store",
+    });
+    sub.returnBy = "store";
+    sub.returnReason = reason;
+
+    // 7) إن كانت كل الـ subOrders ملغاة ⇒ ألغِ الطلب كليًا + حرّر الحجز/الكوبون
+    const allCancelled = order.subOrders.every((s) => s.status === "cancelled");
+    let released = false;
+
+    if (allCancelled) {
+      if (order.status !== "cancelled") {
+        order.status = "cancelled";
+        order.statusHistory.push({
+          status: "cancelled",
+          changedAt: new Date(),
+          changedBy: "store",
+        });
+      }
+      order.returnBy = "store";
+      order.returnReason = reason;
+
+      // 🔑 احصل على userId بشكل آمن (قد يكون ObjectId أو Populated أو حتى null)
+      const userId: any =
+        (order as any).user && (order as any).user._id
+          ? (order as any).user._id
+          : order.user;
+
+      if (userId && Types.ObjectId.isValid(String(userId))) {
+        const s = await mongoose.startSession();
+        s.startTransaction();
+        try {
+          // 1) Release wallet hold
+          await releaseOrder(String(userId), String(order._id), s);
+
+          // 2) تخفيض usedCount للكوبون (إن وُجد)
+          if ((order as any).coupon?.code) {
+            const c = await Coupon.findOne({ code: (order as any).coupon.code }).session(s);
+            if (c) {
+              c.usedCount = Math.max(0, (c.usedCount || 0) - 1);
+              if ((c as any).isUsed) (c as any).isUsed = false;
+              await c.save({ session: s });
+            }
+          }
+
+          await s.commitTransaction();
+          released = true;
+        } catch (e) {
+          await s.abortTransaction();
+          console.error("vendorCancelOrder: release wallet/coupon failed:", (e as Error).message);
+        } finally {
+          s.endSession();
+        }
+      } else {
+        console.warn("vendorCancelOrder: skip release — invalid userId:", userId);
+      }
+    }
+
+    await order.save({ validateModifiedOnly: true });
+
+    // إشعار (غير معطّل لو فشل)
+    try { await notifyOrder("order.cancelled", order); } catch (e) { /* ignore */ }
+
+    // ارجع الطلب (مع populate للعرض فقط)
+    const populated = await DeliveryOrder.findById(order._id)
+      .populate({ path: "subOrders.store", select: "name logo address" })
+      .populate({ path: "user", select: "fullName phone" })
+      .lean();
+
+    res.json({
+      message: allCancelled
+        ? `Order fully cancelled${released ? " and funds released" : ""}`
+        : "Sub-order cancelled for this store",
+      order: populated,
+    });
+  } catch (err: any) {
+    console.error("vendorCancelOrder error:", err);
+          res.status(500).json({ message: err.message || "Internal error" });
+          return;
+  }
+};
 
 export const getOrderNotes = async (req: Request, res: Response) => {
   try {
@@ -1314,49 +1497,73 @@ export const getUserOrders = async (req: Request, res: Response) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    const out = docs.map((o) => {
-      const stores = (o.subOrders || [])
-        .map((so: any) => so.store)
-        .filter(Boolean);
+    const fmtPoint = (p?: any) => {
+      if (!p) return undefined;
+      if (p.label) return p.label;
+      const str = [p.city, p.street].filter(Boolean).join("، ");
+      if (str) return str;
+      const lat = p.location?.lat ?? p.geo?.coordinates?.[1];
+      const lng = p.location?.lng ?? p.geo?.coordinates?.[0];
+      return lat != null && lng != null ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : undefined;
+    };
 
-      // ✅ اشتقاق اسم المتجر المعروض
+    const out = docs.map((o) => {
+      const isUtility = o.orderType === "utility" || !!(o as any).utility;
+      const isErrand  = o.orderType === "errand"  || !!o.errand;
+
+      // اسم/هوية المتجر
+      const stores = (o.subOrders || []).map((so: any) => so.store).filter(Boolean);
       let store = "—";
       let storeId = "—";
       let logo: string | undefined;
 
-      if (stores.length === 1 && stores[0]?._id) {
-        store = stores[0].name || "—";
+      if (isUtility) {
+        const kind = (o as any).utility?.kind; // "gas" | "water"
+        store = kind === "gas" ? "خدمة الغاز" : kind === "water" ? "خدمة الوايت" : "الخدمة";
+        storeId = "utility";
+      } else if (stores.length === 1 && stores[0]?._id) {
+        store   = stores[0].name || "—";
         storeId = String(stores[0]._id);
-        logo = stores[0].logo;
+        logo    = stores[0].logo;
       } else if (stores.length > 1) {
-        store = `عدة متاجر (${stores.length})`;
+        store   = `عدة متاجر (${stores.length})`;
         storeId = "multi";
-      } else if (o.orderType === "errand") {
-        store = "اخدمني";
+      } else if (isErrand) {
+        store   = "اخدمني";
         storeId = "errand";
       }
 
+      // عناوين أخدمني
+      const pickupLabel  = fmtPoint(o.errand?.pickup);
+      const dropoffLabel = fmtPoint(o.errand?.dropoff);
+
       return {
         id: String(o._id),
-        kind: o.orderType === "errand" ? "errand" : "marketplace",
-        category: o.orderType === "errand" ? "اخدمني" : "المتاجر",
+
+        orderType: o.orderType,
+        kind: isUtility ? "utility" : isErrand ? "errand" : "marketplace",
+        category: isUtility
+          ? ((o as any).utility?.kind === "gas" ? "الغاز" : (o as any).utility?.kind === "water" ? "وايت" : "الخدمات")
+          : isErrand ? "اخدمني" : "المتاجر",
+
         rawStatus: o.status,
         status: translateStatus(o.status),
         date: toISODate(o.createdAt),
         time: toLocalTime(o.createdAt),
         monthKey: formatMonthKey(o.createdAt),
 
-        // 👇 أهم شي نعيدها صح
         store,
         storeId,
         logo,
 
-        address: o.address?.label || `${o.address?.city ?? ""}`,
+        address: isErrand
+          ? (dropoffLabel || o.address?.label || `${o.address?.city ?? ""}`)
+          : (o.address?.label || `${o.address?.city ?? ""}`),
+
         deliveryFee: o.deliveryFee ?? 0,
         discount: o.coupon?.discountOnItems ?? 0,
         total: o.price ?? 0,
 
-        // إن كنت تبغى تختصر ولا ترجع السلة كاملة:
         basket: (o.items || []).slice(0, 3).map((it: any) => ({
           name: it.name,
           quantity: it.quantity,
@@ -1364,9 +1571,23 @@ export const getUserOrders = async (req: Request, res: Response) => {
           originalPrice: it.unitPriceOriginal,
         })),
 
+        errand: isErrand ? {
+          pickupLabel:  pickupLabel  || "—",
+          dropoffLabel: dropoffLabel || "—",
+          driverName: (o.driver as any)?.fullName || "—",
+        } : undefined,
+
         notes: (o.notes || [])
           .filter((n: any) => n.visibility === "public")
           .map((n: any) => n.body),
+
+        // (اختياري) أرسل ملخص utility لمساعدة الواجهة
+        utility: isUtility ? {
+          kind: (o as any).utility?.kind,
+          variant: (o as any).utility?.variant,
+          quantity: (o as any).utility?.quantity,
+          city: (o as any).utility?.city || o.address?.city,
+        } : undefined,
       };
     });
 
@@ -1375,6 +1596,7 @@ export const getUserOrders = async (req: Request, res: Response) => {
     res.status(500).json({ message: e.message });
   }
 };
+
 // POST /orders/:id/repeat
 export const repeatOrder = async (req: Request, res: Response) => {
   const session = await mongoose.startSession();

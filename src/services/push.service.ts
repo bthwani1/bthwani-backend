@@ -2,9 +2,11 @@
 import fetch from "node-fetch";
 import PushToken from "../models/PushToken";
 import Notification from "../models/Notification";
+import Expo from "expo-server-sdk";
 
 const EXPO_ENDPOINT = "https://exp.host/--/api/v2/push/send";
 const EXPO_RECEIPTS = "https://exp.host/--/api/v2/push/getReceipts";
+const expo = new Expo();
 
 type ExpoMessage = {
   to: string;
@@ -153,5 +155,20 @@ async function checkReceiptsAndClean(tickets: any[], logId: string) {
         }
       }
     }
+  }
+}
+export async function sendSupportPush(userId: string, body: string) {
+  const tokens = await PushToken.find({ userId, disabled: { $ne: true } }).lean();
+  const expoTokens = tokens.map(t => t.token).filter(Expo.isExpoPushToken);
+  if (expoTokens.length === 0) return;
+
+  const chunks = expo.chunkPushNotifications(expoTokens.map(to => ({
+    to, sound: "default", title: "رسالة جديدة من الدعم", body,
+    data: { type: "support_message" },
+  })));
+
+  for (const c of chunks) {
+    try { await expo.sendPushNotificationsAsync(c as any); }
+    catch (e) { console.warn("Expo push error:", e); }
   }
 }

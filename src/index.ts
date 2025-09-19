@@ -1,5 +1,5 @@
 // src/index.ts
-
+import { registerSupportSocket } from "./sockets/supportHandlers";
 import express from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
@@ -72,6 +72,8 @@ import supportRoutes from "./routes/support.routes";
 import appRoutes from "./routes/app.routes";
 import walletRoutes from "./routes/Wallet_V8/wallet.routes";
 import metaRoutes from "./routes/meta";
+import adminCmsRoutes from "./routes/admin/admin.cms.routes";
+import cmsRoutes from "./routes/cms.routes";
 
 dotenv.config();
 console.log("[BOOT] pid:", process.pid, "build:", new Date().toISOString());
@@ -87,7 +89,6 @@ dayjs.extend(utc);
 dayjs.extend(tz);
 dayjs.tz.setDefault("Asia/Aden");
 process.env.TZ = "Asia/Aden";
-
 // Socket.IO middleware/setup (يظل كما هو)
 io.use(verifyTokenSocket);
 io.on("connection", (socket) => {
@@ -97,8 +98,8 @@ io.on("connection", (socket) => {
     if (uid) socket.leave(`user_${uid}`);
   });
 });
-// إذا لديك مزيد من listeners، اتركها كما هي (كودك الأصلي)
-
+// إذا لديك مزيد من registerSupportSocket(io);
+registerSupportSocket(io);
 // Middleware
 app.use(
   cors({
@@ -135,13 +136,17 @@ app.use(`${API_PREFIX}/delivery/cart`, deliveryCartRouter);
 app.use(`${API_PREFIX}/groceries`, groceriesRoutes);
 app.use(`${API_PREFIX}/meta`, metaRoutes);
 app.use(`${API_PREFIX}/utility`, utilityRoutes);
+app.use(`${API_PREFIX}/cms`, cmsRoutes);
+
 app.use(`${API_PREFIX}/delivery/subcategories`, deliverySubCategoryRoutes);
 app.use(`${API_PREFIX}/delivery/banners`, deliveryBannerRoutes);
 app.use(`${API_PREFIX}/delivery/sections`, storeSectionRoutes);
 app.use(`${API_PREFIX}/favorites`, favoritesRoutes);
-
+app.use(`${API_PREFIX}/`, adminCmsRoutes);
 app.use(`${API_PREFIX}/wallet`, walletRoutes);
 app.use(`${API_PREFIX}/wallet/order`, walletOrderRoutes);
+app.use(`${API_PREFIX}/vendor`, vendorRoutes);
+
 app.use(`${API_PREFIX}`, pushRouter);
 
 app.use(`${API_PREFIX}/topup`, topupRoutes);
@@ -187,7 +192,6 @@ app.use(`${API_PREFIX}/`, activationRoutes);
 app.use(`${API_PREFIX}/deliveryapp/withdrawals`, driverWithdrawalRoutes);
 app.use(`${API_PREFIX}/utility`, utilityRoutes);
 app.use(`${API_PREFIX}/`, rediasRoutes);
-app.use(`${API_PREFIX}/vendor`, vendorRoutes);
 app.use(`${API_PREFIX}/pricing-strategies`, pricingStrategyRoutes);
 app.use(`${API_PREFIX}/`, marketingRouter);
 

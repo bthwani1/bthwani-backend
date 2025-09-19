@@ -30,33 +30,19 @@ export const verifyOTP = async ({
 }: {
   userId?: string;
   email?: string;
-  purpose: string;
+  purpose?: string;
   code: string;
 }) => {
-  const query: any = {
-    purpose,
-    code,
-    used: false,
-    expiresAt: { $gt: new Date() },
-  };
-  if (userId) query.userId = new Types.ObjectId(userId);
-  else if (email) query["metadata.email"] = (email || "").trim().toLowerCase();
+  const q: any = { code, used: false, expiresAt: { $gt: new Date() } };
+  if (userId) q.userId = new Types.ObjectId(userId);
+  else if (email) q["metadata.email"] = (email || "").trim().toLowerCase();
+  if (purpose) q.purpose = purpose; // اختياري بدل ما يكون إجباري
 
-  const otp = await OTP.findOne(query);
+  const otp = await OTP.findOne(q);
   if (!otp) return { valid: false };
 
-  // ✅ حدّث بالمؤكد (userId) ثم إحتماليًا بالإيميل إن وُجد
   await User.updateOne({ _id: otp.userId }, { $set: { emailVerified: true } });
-  if (otp.metadata?.email) {
-    await User.updateOne(
-      { email: otp.metadata.email },
-      { $set: { emailVerified: true } }
-    );
-  }
-
   otp.used = true;
-
   await otp.save();
-
   return { valid: true };
 };

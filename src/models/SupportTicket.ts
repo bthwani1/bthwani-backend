@@ -1,24 +1,15 @@
 // models/SupportTicket.ts
 import { Schema, model } from "mongoose";
 
-const Msg = new Schema(
+const SupportTicket = new Schema(
   {
-    sender: { type: String, enum: ["user", "agent"], required: true },
-    text: String,
-    createdAt: { type: Date, default: Date.now },
+    userId: { type: String, index: true, required: true },
+    subject: { type: String, trim: true, maxlength: 200 },
+    status: { type: String, enum: ["open", "closed"], default: "open", index: true },
+    lastMessageAt: { type: Date, default: Date.now, index: true }, // لفرز التذاكر
   },
-  { _id: true }
+  { timestamps: true }
 );
 
-export default model(
-  "SupportTicket",
-  new Schema(
-    {
-      userId: { type: String, index: true }, // <-- كان ObjectId: غيّرناه إلى String
-      subject: String,
-      status: { type: String, enum: ["open", "closed"], default: "open" },
-      messages: [Msg],
-    },
-    { timestamps: true }
-  )
-);
+SupportTicket.index({ userId: 1, lastMessageAt: -1 });
+export default model("SupportTicket", SupportTicket);

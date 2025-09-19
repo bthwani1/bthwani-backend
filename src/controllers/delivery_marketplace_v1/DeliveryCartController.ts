@@ -16,130 +16,153 @@ interface RemoveItemParams {
   productType: string;
 }
 
+
+const NEAR_STORE_KM = 3; // 👈 عدّل العتبة كما تريد
+
+function km(a: {lat:number,lng:number}, b:{lat:number,lng:number}) {
+  return getDistance(
+    { latitude: a.lat, longitude: a.lng },
+    { latitude: b.lat, longitude: b.lng }
+  ) / 1000;
+}
+
+// =============== addOrUpdateCart ===============
+
 export const addOrUpdateCart = async (req: Request, res: Response) => {
   try {
-    console.log("🔴 BODY FULL:", req.body);
-
-    // 1. استخراج العناصر
     let itemsArr = req.body.items || [];
-    let cartId = req.body.cartId;
-    let note = req.body.note; // استخرج الملاحظة
+    const cartIdInput = req.body.cartId;
+    const note = req.body.note;
 
-    // 2. معالجة حالة الإرسال الفردي (حافظ على منطق التوافق)
     if (!Array.isArray(itemsArr)) {
       const {
-        productId,
-        name,
-        price,
-        quantity,
-        storeId: itemStoreId,
-        store: itemStore,
-        image,
+        productId, name, price, quantity,
+        storeId: itemStoreId, store: itemStore, image, productType,
       } = req.body;
-
-      itemsArr = [
-        {
-          productId: productId || req.body.product,
-          name,
-          price,
-          quantity,
-          store: itemStoreId || itemStore,
-          image,
-        },
-      ];
+      itemsArr = [{
+        productId: productId || req.body.product,
+        productType: productType || "deliveryProduct",
+        name, price, quantity, store: itemStoreId || itemStore, image,
+      }];
     }
+    if (!itemsArr?.length) return res.status(400).json({ message: "items مطلوبة" });
 
-    // 3. التحقق من صحة البيانات
-    if (!itemsArr || itemsArr.length === 0) {
-      res.status(400).json({ message: "items مطلوبة" });
-      return;
-    }
+    const toObjectId = (v:any) =>
+      typeof v === "string" && mongoose.Types.ObjectId.isValid(v)
+        ? new mongoose.Types.ObjectId(v) : v;
 
-    const toObjectId = (v: any) => {
-      if (!v) return undefined;
-      return typeof v === "string" && mongoose.Types.ObjectId.isValid(v)
-        ? new mongoose.Types.ObjectId(v)
-        : v;
-    };
-
-    // 4. معالجة المستخدم - احصل على هوية المستخدم من Firebase UID أو من req.user.id
     const uid = (req as any).firebaseUser?.uid || (req as any).user?.id || null;
+    const userDoc = uid ? await User.findOne({ firebaseUID: uid }).select("_id") : null;
+    const userObjId = userDoc?._id;
 
-    let dbUser = null;
-    if (uid) {
-      dbUser = await User.findOne({ firebaseUID: uid }).select("_id");
-    }
-
-    const userObjId = dbUser?._id;
-
-    // 5. تحويل المعرفات لكل عنصر
     const itemsMapped = itemsArr
-      .map((it) => ({
+      .map((it:any) => ({
         productId: toObjectId(it.productId || it.product || it.id),
         productType: it.productType || "deliveryProduct",
         name: it.name,
-        price: it.price,
-        quantity: it.quantity,
+        price: Number(it.price) || 0,
+        quantity: Math.max(1, Number(it.quantity) || 1),
         store: toObjectId(it.storeId || it.store),
         image: it.image,
       }))
-      .filter((i) => i.productId && i.store);
+      .filter((i:any) => i.productId && i.store);
 
-    // 6. البحث عن السلة الحالية أو إنشاؤها/تحديثها
-    const total = itemsMapped.reduce(
-      (sum, it) => sum + it.price * it.quantity,
-      0
-    );
+    if (!itemsMapped.length) return res.status(400).json({ message: "items غير صالحة" });
 
-    console.log("🟢 سيتم حفظ الكارت بالقيم التالية:");
-    console.log("user:", userObjId);
-    console.log("items:", itemsMapped);
+    // لا تسمح في نفس الطلب بأكثر من متجر جديد (لتبسيط القرار)
+    const newStores = Array.from(new Set(itemsMapped.map((i:any) => String(i.store))));
+    if (newStores.length > 1) {
+      return res.status(400).json({ message: "أرسل متجرًا واحدًا في كل إضافة" });
+    }
+    const newStoreId = newStores[0];
 
-    // استخدم findOneAndUpdate مع upsert لربط السلة بالمستخدم
-    const cartDoc = await DeliveryCart.findOneAndUpdate(
-      userObjId ? { user: userObjId } : { cartId }, // لو مستخدم مسجل خذه، وإلا cartId للضيف
-      {
-        user: userObjId, // اربطها بالمستخدم عند التسجيل
-        cartId: cartId || new mongoose.Types.ObjectId().toString(),
-        items: itemsMapped,
-        total,
-        note,
-      },
-      { upsert: true, new: true }
-    );
+    const filter:any = userObjId ? { user: userObjId } : { cartId: String(cartIdInput || "") };
+    let cartDoc = await DeliveryCart.findOne(filter);
 
-    // تحديث العناصر الموجودة إذا كانت السلة موجودة مسبقاً
-    if (cartDoc.items.length > 0) {
-      for (const newItem of itemsMapped) {
-        const existingItemIndex = cartDoc.items.findIndex(
-          (item) =>
-            (item.productId?.toString() ?? "") ===
-              (newItem.productId?.toString() ?? "") &&
-            item.productType === newItem.productType
+    if (!cartDoc && !userObjId) {
+      filter.cartId = String(cartIdInput || new mongoose.Types.ObjectId().toString());
+    }
+
+    // ⚠️ حارس القرب: إذا السلة فيها متاجر، تحقّق قرب المتجر الجديد منها
+    if (cartDoc?.items?.length) {
+      const existingStoreIds = Array.from(
+        new Set(cartDoc.items.map((it:any) => String(it.store)))
+      );
+
+      // لو المتجر الجديد موجود أصلاً، نكمّل
+      if (!existingStoreIds.includes(newStoreId as string)) {
+        const stores = await DeliveryStore.find({
+          _id: { $in: [...existingStoreIds, newStoreId] },
+        }).select("location").lean();
+
+        const byId: Record<string, any> = Object.fromEntries(
+          stores.map((s:any) => [String(s._id), s])
         );
 
-        if (existingItemIndex !== -1) {
-          cartDoc.items[existingItemIndex].quantity += newItem.quantity;
-        } else {
-          cartDoc.items.push(newItem);
+        const newStore = byId[newStoreId as string];
+        if (!newStore?.location) {
+          return res.status(404).json({ message: "المتجر غير موجود" });
+        }
+
+        // أقل مسافة بين المتجر الجديد وكل متجر موجود
+        let minKm = Infinity;
+        for (const sid of existingStoreIds) {
+          const st = byId[sid];
+          if (!st?.location) continue;
+          const d = km(
+            { lat: newStore.location.lat, lng: newStore.location.lng },
+            { lat: st.location.lat,  lng: st.location.lng }
+          );
+          minKm = Math.min(minKm, d);
+        }
+
+        if (!isFinite(minKm) || minKm > NEAR_STORE_KM) {
+          return res.status(409).json({
+            code: "CART_STORE_TOO_FAR",
+            message: "لا يمكن خلط متاجر بعيدة ضمن نفس السلة",
+            nearestDistanceKm: isFinite(minKm) ? +minKm.toFixed(2) : null,
+            thresholdKm: NEAR_STORE_KM,
+            currentStores: existingStoreIds,
+            newStore: newStoreId,
+          });
         }
       }
-
-      // إعادة حساب الإجمالي
-      cartDoc.total = cartDoc.items.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
-      );
-      await cartDoc.save();
     }
-    res.status(201).json({
-      cart: cartDoc,
-      cartId: cartDoc.cartId,
-    });
-  } catch (err: any) {
+
+    // إنشاء السلة إن لم تكن موجودة
+    if (!cartDoc) {
+      cartDoc = await DeliveryCart.create({
+        user: userObjId, cartId: filter.cartId, items: [], total: 0, note,
+      });
+    } else if (typeof note === "string") {
+      cartDoc.note = note;
+    }
+
+    // دمج العناصر (productId + productType)
+    for (const newItem of itemsMapped) {
+      const idx = cartDoc.items.findIndex(
+        (i:any) =>
+          String(i.productId) === String(newItem.productId) &&
+          i.productType === newItem.productType
+      );
+      if (idx >= 0) {
+        cartDoc.items[idx].quantity += newItem.quantity;
+      } else {
+        cartDoc.items.push(newItem as any);
+      }
+    }
+
+    cartDoc.total = cartDoc.items.reduce(
+      (sum:number, it:any) => sum + (Number(it.price) || 0) * (it.quantity || 0), 0
+    );
+    await cartDoc.save();
+
+    res.status(201).json({ cart: cartDoc, cartId: cartDoc.cartId });
+  } catch (err:any) {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 export const updateCartItemQuantity = async (req: Request, res: Response) => {
   try {

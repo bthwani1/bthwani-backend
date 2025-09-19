@@ -36,6 +36,8 @@ import {
 import { uploadAvatar } from "../controllers/user/userAvatarController";
 import { sendEmailOTP, verifyOTP } from "../controllers/otpControllers";
 import { User } from "../models/user";
+import { OTP } from "../models/otp";
+import { Types } from "mongoose";
 
 const router = Router();
 
@@ -678,75 +680,88 @@ router.post("/otp/send", verifyFirebase, async (req, res) => {
     const fb = (req as any).firebaseUser;
     const uid = fb?.uid;
     const email = fb?.email;
-
     if (!uid || !email) {
-      res.status(401).json({ message: "Unauthorized" });
+      res.status(401).json({ ok:false, message:"Unauthorized" });
       return;
     }
 
     const user = await User.findOne({ firebaseUID: uid }).lean();
-    if (!user) {
-      res.status(404).json({ message: "المستخدم غير موجود" });
+    if (!user)    {
+      res.status(404).json({ ok:false, message:"المستخدم غير موجود" });
       return;
     }
 
-    // 🟢 استدعِ دالتك كما هي: (email, userId, purpose)
-    const code = await sendEmailOTP(email, String(user._id), "verifyEmail");
+    const purpose = "verifyEmail"; // ثبّت القيمة
+    const code = await sendEmailOTP(email, String(user._id), purpose);
 
-    // وضع التطوير: أطبع الكود بدل الاعتماد على SMTP
-    const ch = "smtp";
-    if (ch !== "smtp") {
-      console.log(`📧 DEV OTP to ${email}: ${code}`);
-      res.json({ ok: true, dev: true });
-      return;
-    }
-    res.json({ ok: true });
-    return;
+    // في التطوير: أعِد الكود لمساعدة الاختبار
+    const isDev = process.env.NODE_ENV !== "production";
+    // أرسل الرد فورًا
+    res.json({ ok: true, ...(isDev && { devCode: code }) });
+    
+    // وابعث الإيميل بدون حبس الرد (لو حاب تنتظر بحد أقصى):
+    // void (async () => {
+    //   try {
+    //     await Promise.race([sendOtpEmail(email, code), new Promise((_,rej)=>setTimeout(()=>rej(new Error('smtp-timeout')), 5000))]);
+    //   } catch (e) { console.error("SMTP later error:", e?.code || e); }
+    // })();
+
   } catch (err: any) {
-    console.error("❌ /users/otp/send failed:", err?.message || err);
-    res.status(500).json({ message: "فشل الإرسال", error: err?.message });
+    console.error("❌ /users/otp/send failed:", err);
+    res.status(500).json({ ok:false, message:"فشل الإرسال" });
+    return;
   }
 });
+
 
 router.post("/otp/verify", verifyFirebase, async (req, res) => {
   try {
     const fb = (req as any).firebaseUser;
     const uid = fb?.uid;
-    if (!uid) {
-      res.status(401).json({ message: "Unauthorized" });
+    if (!uid)    {
+      res.status(401).json({ ok:false, message:"Unauthorized" });
       return;
     }
+
     const { code } = req.body || {};
-    if (!code) {
-      res.status(400).json({ message: "رمز التحقق مطلوب" });
+    if (!code || String(code).length !== 6) {
+      res.status(400).json({ ok:false, code: "BAD_CODE", message: "رمز التحقق مطلوب" });
       return;
     }
 
     const user = await User.findOne({ firebaseUID: uid }).lean();
     if (!user) {
-      res.status(404).json({ message: "المستخدم غير موجود" });
+      res.status(404).json({ ok:false, message: "المستخدم غير موجود" });
       return;
     }
 
-    const result = await verifyOTP({
-      userId: String(user._id),
+    const q = {
+      userId: new Types.ObjectId(String(user._id)),
       purpose: "verifyEmail",
       code: String(code),
-    });
+      used: false,
+      expiresAt: { $gt: new Date() },
+    };
 
-    if (!result.valid) {
-      res
-        .status(400)
-        .json({ code: "BAD_OTP", message: "رمز غير صحيح أو منتهي" });
+    const otp = await OTP.findOne(q);
+    if (!otp) {
+      console.warn("OTP not found with query:", q);
+      res.status(400).json({ ok:false, code:"BAD_OTP", message:"رمز غير صحيح أو منتهي" });
       return;
     }
 
-    res.json({ ok: true, verified: true, code: "VERIFIED" });
+    await User.updateOne({ _id: user._id }, { $set: { emailVerified: true } });
+    otp.used = true;
+    await otp.save();
+
+    res.json({ ok:true, verified:true, code:"VERIFIED" });
     return;
   } catch (err: any) {
-    console.error("❌ /users/otp/verify failed:", err?.message || err);
-    res.status(500).json({ message: "فشل التحقق", error: err?.message });
+    console.error("❌ /users/otp/verify failed:", err);
+    res.status(500).json({ ok:false, message:"فشل التحقق" });
+    return;
   }
 });
+
 
 export default router;

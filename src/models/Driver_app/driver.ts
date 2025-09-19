@@ -161,6 +161,6 @@ glDepositAccount:    { type: Schema.Types.ObjectId, ref: 'ChartAccount' }, // 21
   },
   { timestamps: true }
 );
+DriverSchema.index({ location: "2dsphere" });
 
 export default mongoose.model<IDriver>("Driver", DriverSchema);
-DriverSchema.index({ location: "2dsphere" });

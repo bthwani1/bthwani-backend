@@ -28,10 +28,14 @@ export const vendorLogin = async (req, res) => {
   }
 
   const token = jwt.sign(
-    { id: vendor._id, role: "vendor" },
-    process.env.JWT_SECRET,
+    {
+      vendorId: vendor._id.toString(),
+      role: "vendor",
+    },
+    process.env.JWT_SECRET!,
     { expiresIn: "7d" }
   );
+
   res.json({ token, vendor });
 };
 
@@ -120,7 +124,7 @@ export const listVendors = async (req: Request, res: Response) => {
 };
 export const getMerchantReports = async (req: Request, res: Response) => {
   try {
-    const vendorId = req.user!.id;
+    const vendorId = req.user!.vendorId;
     // جلب الـ Vendor لنعرف المتجر
     const vendor = await Vendor.findOne({
       user: vendorId,
