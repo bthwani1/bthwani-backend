@@ -42,10 +42,17 @@ export const vendorLogin = async (req, res) => {
 // جلب بيانات التاجر (Vendor) بناءً على الـ userId الموجود في الـ JWT
 export const getMyProfile = async (req: Request, res: Response) => {
   try {
-    const userId = (req.user as any).id as string;
-    const vendor = await Vendor.findOne({ user: userId })
+    const vendorId = (req.user as any)?.vendorId || (req.user as any)?.id;
+    if (!vendorId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const vendor = await Vendor.findById(vendorId)
       .populate("store", "name address")
+      .select("-password")
       .lean();
+
     if (!vendor) {
       res.status(404).json({ message: "Vendor profile not found" });
       return;
@@ -59,17 +66,25 @@ export const getMyProfile = async (req: Request, res: Response) => {
 // تعديل بيانات التاجر (fullName, phone, email)
 export const updateMyProfile = async (req: Request, res: Response) => {
   try {
-    const userId = (req.user as any).id as string;
+    const vendorId = (req.user as any)?.vendorId || (req.user as any)?.id;
+    if (!vendorId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
     const updates: Partial<IVendor> = {};
-    ["fullName", "phone", "email"].forEach((field) => {
+    (["fullName", "phone", "email"] as const).forEach((field) => {
       if (req.body[field] !== undefined) {
         (updates as any)[field] = req.body[field];
       }
     });
 
-    const updated = await Vendor.findOneAndUpdate({ user: userId }, updates, {
-      new: true,
-    }).lean();
+    const updated = await Vendor.findByIdAndUpdate(
+      vendorId,
+      { $set: updates },
+      { new: true, projection: { password: 0 } }
+    ).lean();
+
     if (!updated) {
       res.status(404).json({ message: "Vendor not found" });
       return;
@@ -79,6 +94,7 @@ export const updateMyProfile = async (req: Request, res: Response) => {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 // ربط متجر بالتاجر (attach)
 export const attachStoreToVendor = async (req: Request, res: Response) => {

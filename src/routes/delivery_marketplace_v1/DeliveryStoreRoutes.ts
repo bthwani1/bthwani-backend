@@ -12,11 +12,11 @@ router.get("/", controller.getAll);
 router.get("/search", controller.searchStores);
 
 router.get("/:id", controller.getById);
+router.put("/:id",  controller.update);
 
 // أدمن فقط
 const adminOnly = [verifyFirebase, verifyAdmin];
 router.post("/", ...adminOnly, controller.create);
-router.put("/:id", ...adminOnly, controller.update);
 router.delete("/:id", ...adminOnly, controller.remove);
 
 export default router;

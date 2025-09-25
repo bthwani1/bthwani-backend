@@ -19,6 +19,7 @@ import adminDriverRoutes from "./routes/admin/admin.driver.routes";
 import topupRoutes from "./routes/Wallet_V8/topupRoutes";
 import driverWithdrawalRoutes from "./routes/driver_app/driver.withdrawal.routes";
 import vendorRoutes from "./routes/vendor_app/vendor.routes";
+import settlementRoutes from "./routes/vendor_app/settlement.routes";
 import storeStatsRoutes from "./routes/admin/storeStatsRoutes";
 import adminNotificationTestRoutes from "./routes/admin/admin.notifications.test";
 import deliveryCategoryRoutes from "./routes/delivery_marketplace_v1/DeliveryCategoryRoutes";
@@ -56,7 +57,7 @@ import marketerOverviewRoutes from "./routes/marketerV1/marketerOverviewRoutes";
 import adminVendorModeration from "./routes/admin/vendorModerationRoutes";
 import adminOnboarding from "./routes/admin/onboardingRoutes";
 import adminCommission from "./routes/admin/commissionPlansRoutes";
-import adminReports from "./routes/admin/reportsRoutes";
+import marketerReports from "./routes/admin/reportsRoutes";
 import utilityRoutes from "./routes/delivery_marketplace_v1/utility";
 import adminMarketers from "./routes/admin/marketersRoutes";
 import adminStoreModeration from "./routes/admin/storeModerationRoutes";
@@ -74,7 +75,7 @@ import walletRoutes from "./routes/Wallet_V8/wallet.routes";
 import metaRoutes from "./routes/meta";
 import adminCmsRoutes from "./routes/admin/admin.cms.routes";
 import cmsRoutes from "./routes/cms.routes";
-
+  
 dotenv.config();
 console.log("[BOOT] pid:", process.pid, "build:", new Date().toISOString());
 
@@ -128,12 +129,23 @@ app.use(`${API_PREFIX}/auth/password`, passwordResetRouter);
 app.use(`${API_PREFIX}/delivery/promotions`, deliveryPromotionRoutes);
 app.use(`${API_PREFIX}/delivery/categories`, deliveryCategoryRoutes);
 app.use(`${API_PREFIX}/delivery/order`, deliveryOrderRoutes);
+app.use(`${API_PREFIX}/auth`, marketingAuthRoutes);
+app.use(`${API_PREFIX}/reports/marketers`, marketerReports);
+app.use(`${API_PREFIX}/field/onboarding`, onboardingRoutes);
+app.use(`${API_PREFIX}/files`, mediaMarketerRoutes);
+app.use(`${API_PREFIX}/field`, quickOnboardRoutes);
 
+app.use(`${API_PREFIX}/driver`, driverRoutes);
+
+
+app.use(`${API_PREFIX}/vendor`, vendorRoutes);
+app.use(`${API_PREFIX}/vendor/settlements`, settlementRoutes);
 app.use(`${API_PREFIX}/delivery/stores`, deliveryStoreRoutes);
 app.use(`${API_PREFIX}/delivery/products`, deliveryProductRoutes);
 app.use(`${API_PREFIX}/delivery/offer`, DeliveryOfferRoutes);
 app.use(`${API_PREFIX}/delivery/cart`, deliveryCartRouter);
 app.use(`${API_PREFIX}/groceries`, groceriesRoutes);
+
 app.use(`${API_PREFIX}/meta`, metaRoutes);
 app.use(`${API_PREFIX}/utility`, utilityRoutes);
 app.use(`${API_PREFIX}/cms`, cmsRoutes);
@@ -145,7 +157,7 @@ app.use(`${API_PREFIX}/favorites`, favoritesRoutes);
 app.use(`${API_PREFIX}/`, adminCmsRoutes);
 app.use(`${API_PREFIX}/wallet`, walletRoutes);
 app.use(`${API_PREFIX}/wallet/order`, walletOrderRoutes);
-app.use(`${API_PREFIX}/vendor`, vendorRoutes);
+
 
 app.use(`${API_PREFIX}`, pushRouter);
 
@@ -154,15 +166,12 @@ app.use(`${API_PREFIX}/support`, supportRoutes);
 app.use(`${API_PREFIX}/app`, appRoutes);
 
 app.use(`${API_PREFIX}/admin`, adminRoutes);
+app.use(`${API_PREFIX}/admin/marketers`, adminMarketers);
 
 app.use(`${API_PREFIX}/admin/drivers`, adminDriverRoutes);
 app.use(`${API_PREFIX}/`, adminVendorModeration);
 
-app.use(`${API_PREFIX}/auth/`, marketingAuthRoutes);
-app.use(`${API_PREFIX}/`, onboardingRoutes);
-app.use(`${API_PREFIX}/`, adminReports);
-app.use(`${API_PREFIX}/files`, mediaMarketerRoutes);
-app.use(`${API_PREFIX}/field`, quickOnboardRoutes);
+
 // Routes (كما في كودك)
 app.use(`${API_PREFIX}/media`, mediaRoutes);
 app.use(`${API_PREFIX}/employees`, employeeRoutes);
@@ -174,10 +183,10 @@ app.use(`${API_PREFIX}/admin/notifications`, adminNotificationRoutes);
 app.use(`${API_PREFIX}/entries`, journalEntryRouter);
 app.use(`${API_PREFIX}/accounts`, chartAccountRoutes);
 app.use(`${API_PREFIX}/journals`, journalBookRouter);
-app.use(`${API_PREFIX}/driver`, driverRoutes);
 app.use(`${API_PREFIX}/admin/withdrawals`, adminWithdrawalRoutes);
 app.use(`${API_PREFIX}/admin/storestats`, storeStatsRoutes);
 app.use(`${API_PREFIX}/admin/notifications`, adminNotificationRoutes);
+
 
 app.use(`${API_PREFIX}/`, adminNotificationTestRoutes);
 app.use(`${API_PREFIX}/`, marketerStoreVendorRoutes);
@@ -186,7 +195,6 @@ app.use(`${API_PREFIX}/`, adminOnboarding);
 app.use(`${API_PREFIX}/`, adminCommission);
 app.use(`${API_PREFIX}`, StatestoreRoutes);
 
-app.use(`${API_PREFIX}/admin/marketers`, adminMarketers);
 app.use(`${API_PREFIX}/`, adminStoreModeration);
 app.use(`${API_PREFIX}/`, activationRoutes);
 app.use(`${API_PREFIX}/deliveryapp/withdrawals`, driverWithdrawalRoutes);

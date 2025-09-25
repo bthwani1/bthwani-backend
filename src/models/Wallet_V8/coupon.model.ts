@@ -29,5 +29,4 @@ const CouponSchema = new Schema<CouponType>({
 });
 
 export const Coupon: Model<CouponType> = mongoose.model("Coupon", CouponSchema);
-CouponSchema.index({ code: 1 }, { unique: true });
 CouponSchema.index({ assignedTo: 1, expiryDate: 1 });

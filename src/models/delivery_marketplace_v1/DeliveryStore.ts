@@ -40,7 +40,7 @@ export interface IDeliveryStore extends Document {
   createdByMarketerUid: { type: String; index: true }; // UID من Firebase
   participants: [
     {
-      uid: String;
+      marketerId: String;
       role: { type: String; enum: ["lead", "support"]; default: "lead" };
       weight: { type: Number; default: 0.5 };
     }
@@ -106,7 +106,7 @@ const storeSchema = new Schema<IDeliveryStore>(
     createdByMarketerUid: { type: String }, // uid من Firebase للمسوّق الذي أنشأ المتجر
     participants: [
       {
-        uid: { type: String, required: true },
+        marketerId: { type: String, required: true },
         role: { type: String, enum: ["lead", "support"], default: "lead" },
         weight: { type: Number, default: 0.5 },
       },
@@ -242,3 +242,5 @@ storeSchema.index(
   { rating: -1, ratingsCount: -1 },
   { name: "rating_rank_index" }
 );
+storeSchema.index({ createdByMarketerUid: 1, createdAt: -1 });
+storeSchema.index({ "geo": "2dsphere" });

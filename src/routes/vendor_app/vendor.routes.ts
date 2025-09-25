@@ -9,8 +9,172 @@ import Vendor from "../../models/vendor_app/Vendor";
 import Order from "../../models/delivery_marketplace_v1/Order";
 import { verifyVendorJWT } from "../../middleware/verifyVendorJWT";
 import MerchantProduct from "../../models/mckathi/MerchantProduct";
+// routes/vendor.account.ts
 
+import mongoose from "mongoose";
+import { computeVendorBalance } from "../../services/vendor/balance.service";
+import SettlementRequest from "../../models/vendor_app/SettlementRequest";
+
+
+// Helper: جلب storeId من التوكن
+async function getStoreId(req) {
+  const vendor = await Vendor.findById(req.user.vendorId).lean();
+  if (!vendor?.store) throw new Error("لا يوجد متجر مرتبط بهذا التاجر");
+  return new mongoose.Types.ObjectId(vendor.store);
+}
 const router = Router();
+
+// 1) الرصيد + ملخص
+router.get("/account/statement", verifyVendorJWT, async (req, res) => {
+  try {
+    const storeId = await getStoreId(req);
+    const balance = await computeVendorBalance(storeId);
+
+    const lastCompleted = await SettlementRequest.findOne({
+      store: storeId,
+      status: "completed",
+    })
+      .sort({ processedAt: -1 })
+      .lean();
+
+    const pendingTotal = await SettlementRequest.aggregate([
+      { $match: { store: storeId, status: "pending" } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+
+    res.json({
+      currentBalance: balance.net,
+      pendingTotal: pendingTotal[0]?.total || 0,
+      lastCompleted: lastCompleted
+        ? {
+            amount: lastCompleted.amount,
+            processedDate: lastCompleted.processedAt,
+          }
+        : null,
+    });
+  } catch (e: any) {
+    res.status(400).json({ message: e.message });
+  }
+});
+
+// 2) كشف المبيعات (بدون أسماء العملاء)
+router.get("/sales", verifyVendorJWT, async (req, res) => {
+  try {
+    const storeId = await getStoreId(req);
+    const limit = Math.min(parseInt(String(req.query.limit || 50), 10), 200);
+    const sales = await Order.aggregate([
+      { $match: { "subOrders.store": storeId } },
+      { $sort: { createdAt: -1 } },
+      { $limit: limit },
+      {
+        $project: {
+          _id: 0,
+          orderId: { $toString: "$_id" },
+          date: { $dateToString: { date: "$createdAt", format: "%Y-%m-%d" } },
+          // المبلغ كناتج إجمالي العناصر الخاصة بهذا المتجر فقط
+          items: "$subOrders.items",
+          subOrders: "$subOrders",
+          // لا نعيد أي اسم عميل إطلاقًا (Privacy by default)
+        },
+      },
+    ]);
+
+    // حوّل إلى سجل مبسط مع عمولة وصافي (احتساب بسيط)
+    const store = await Vendor.findById(req.user.vendorId)
+      .populate("store", "commissionRate")
+      .lean();
+    const commissionRate = (store as any)?.store?.commissionRate ?? 0;
+
+    const flattened = sales.map((s: any) => {
+      // احسب إجمالي عناصر هذا المتجر فقط
+      let amount = 0;
+      for (const so of s.subOrders) {
+        if (String(so.store) === String(storeId)) {
+          for (const it of so.items || []) {
+            amount += (it.unitPrice || 0) * (it.quantity || 0);
+          }
+        }
+      }
+      const commission = Math.round((amount * commissionRate) / 100);
+      const netAmount = amount - commission;
+      return {
+        id: s.orderId,
+        orderId: s.orderId,
+        amount,
+        date: s.date,
+        customerCode: `عميل #${s.orderId.slice(-6)}`, // معرف بديل غير معرف شخصي
+        commission,
+        netAmount,
+      };
+    });
+
+    res.json(flattened);
+  } catch (e: any) {
+    res.status(400).json({ message: e.message });
+  }
+});
+
+// 3) إنشاء طلب تصفية
+router.post("/settlements", verifyVendorJWT, async (req, res) => {
+  try {
+    const { amount, bankAccount } = req.body;
+    const storeId = await getStoreId(req);
+    const vendorId = req.user.vendorId;
+
+    if (!amount || amount <= 0) {
+      res.status(400).json({ message: "الرجاء إدخال مبلغ صحيح" });
+      return;
+    }
+    if (amount < 30000) {
+      res.status(400).json({ message: "أقل مبلغ للسحب هو 30,000" });
+      return;
+    }
+
+    const { net } = await computeVendorBalance(storeId);
+    if (amount > net) {
+      res.status(400).json({ message: "المبلغ المطلوب أكبر من الرصيد المتاح" });
+      return;
+    }
+
+    const reqDoc = await SettlementRequest.create({
+      vendor: vendorId,
+      store: storeId,
+      amount,
+      status: "pending",
+      bankAccount,
+    });
+
+    res.status(201).json(reqDoc);
+  } catch (e: any) {
+    res.status(400).json({ message: e.message });
+  }
+});
+
+// 4) سجل طلبات التصفية (للتاجر)
+router.get("/settlements", verifyVendorJWT, async (req, res) => {
+  try {
+    const storeId = await getStoreId(req);
+    const list = await SettlementRequest.find({ store: storeId })
+      .sort({ requestedAt: -1 })
+      .lean();
+    res.json(
+      list.map((r) => ({
+        id: String(r._id),
+        amount: r.amount,
+        status: r.status,
+        requestedDate: r.requestedAt?.toISOString().slice(0, 10),
+        processedDate: r.processedAt
+          ? r.processedAt.toISOString().slice(0, 10)
+          : undefined,
+        bankAccount: r.bankAccount || "",
+      }))
+    );
+  } catch (e: any) {
+    res.status(400).json({ message: e.message });
+  }
+});
+
+
 
 // كل المسارات هنا محمية بمستخدم مسجّل من نوع vendor
 router.get(
@@ -20,16 +184,61 @@ router.get(
   controller.listVendors
 );
 // جلب بيانات التاجر (vendor نفسه)
-router.get("/me", controller.getMyProfile);
 
 router.post("/auth/vendor-login", controller.vendorLogin);
 
 // تعديل بيانات التاجر (fullName, phone, إلخ)
-router.put(
-  "/me",
-  // تحقق من صحة الحقول هنا
-  controller.updateMyProfile
-);
+router.put("/me/profile", verifyVendorJWT, controller.updateMyProfile);
+router.get("/me/profile", verifyVendorJWT, controller.getMyProfile);
+
+
+router.get("/settings/notifications", verifyVendorJWT, async (req, res) => {
+  const v = await Vendor.findById(req.user!.vendorId).lean();
+  if (!v) {
+    res.status(404).json({ message: "Vendor not found" });
+    return;
+  }
+  res.json(v.notificationSettings || {
+    enabled: true,
+    orderAlerts: true,
+    financialAlerts: true,
+    marketingAlerts: false,
+    systemUpdates: true,
+  });
+});
+
+// تحديث تفضيلات الإشعارات
+router.put("/settings/notifications", verifyVendorJWT, async (req, res) => {
+  const body = req.body || {};
+  const v = await Vendor.findByIdAndUpdate(
+    req.user!.vendorId,
+    { $set: { notificationSettings: {
+      enabled: !!body.enabled,
+      orderAlerts: !!body.orderAlerts,
+      financialAlerts: !!body.financialAlerts,
+      marketingAlerts: !!body.marketingAlerts,
+      systemUpdates: !!body.systemUpdates,
+    }}},
+    { new: true, projection: { notificationSettings: 1 } }
+  ).lean();
+  if (!v) {
+    res.status(404).json({ message: "Vendor not found" });
+    return;
+  }
+  res.json(v.notificationSettings);
+});
+
+// طلب حذف الحساب (الذي تستدعيه من الشاشة)
+router.post("/account/delete-request", verifyVendorJWT, async (req, res) => {
+  const { reason, exportData } = req.body || {};
+  // سجل طلب الحذف في قاعدة البيانات لو عندك موديل مثل DeletionRequest
+  // أو اكتفِ بإشارة على حساب البائع pendingDeletion
+  await Vendor.updateOne(
+    { _id: req.user!.vendorId },
+    { $set: { pendingDeletion: { requestedAt: new Date(), reason: reason || null, exportData: !!exportData } } }
+  );
+  res.status(202).json({ ok: true });
+});
 router.post("/", verifyFirebase, verifyAdmin, addVendor);
 // إضافة متجر جديد (مثلاً يربط vendor بمتجر)
 // body: { storeId: ObjectId }

@@ -124,61 +124,61 @@ export const getMerchantProductsByMerchant = async (
   }
 };
 
-// --- جلب منتج تاجر مفرد
-export const getMerchantProductById = async (req: Request, res: Response) => {
-  try {
-    const city =
-      (req.query.city as string) ||
-      (req.headers["x-city"] as string) ||
-      undefined;
-    const channel: "app" | "web" = (req.query.channel as any) || "app";
+  // --- جلب منتج تاجر مفرد
+  export const getMerchantProductById = async (req: Request, res: Response) => {
+    try {
+      const city =
+        (req.query.city as string) ||
+        (req.headers["x-city"] as string) ||
+        undefined;
+      const channel: "app" | "web" = (req.query.channel as any) || "app";
 
-    const mp = await MerchantProduct.findById(req.params.id)
-      .populate({
-        path: "product",
-        populate: { path: "attributes.attribute category" },
-      })
-      .populate("merchant")
-      .populate("store")
-      .populate("customAttributes.attribute")
-      .lean();
+      const mp = await MerchantProduct.findById(req.params.id)
+        .populate({
+          path: "product",
+          populate: { path: "attributes.attribute category" },
+        })
+        .populate("merchant")
+        .populate("store")
+        .populate("customAttributes.attribute")
+        .lean();
 
-    if (!mp) {
-      res.status(404).json({ message: "المنتج غير موجود" });
-      return;
-    }
-
-    const promos = await fetchActivePromotions({ city, channel });
-
-    const catalog = mp.product as any;
-    let categories: any[] = [];
-    if (catalog?.category) {
-      if (Array.isArray(catalog.category)) {
-        categories = catalog.category.map((cat: any) => cat._id || cat);
-      } else {
-        categories = [catalog.category._id || catalog.category];
+      if (!mp) {
+        res.status(404).json({ message: "المنتج غير موجود" });
+        return;
       }
-    }
-    const priced = applyPromotionToProduct(
-      {
-        _id: mp._id,
-        price: mp.price,
-        store: mp.store?._id || mp.store,
-        categories,
-      },
-      promos
-    );
 
-    res.json({
-      ...mp,
-      originalPrice: priced.originalPrice,
-      price: priced.finalPrice,
-      appliedPromotion: priced.appliedPromotion,
-    });
-  } catch (err: any) {
-    res.status(500).json({ message: "حدث خطأ", error: err.message || err });
-  }
-};
+      const promos = await fetchActivePromotions({ city, channel });
+
+      const catalog = mp.product as any;
+      let categories: any[] = [];
+      if (catalog?.category) {
+        if (Array.isArray(catalog.category)) {
+          categories = catalog.category.map((cat: any) => cat._id || cat);
+        } else {
+          categories = [catalog.category._id || catalog.category];
+        }
+      }
+      const priced = applyPromotionToProduct(
+        {
+          _id: mp._id,
+          price: mp.price,
+          store: mp.store?._id || mp.store,
+          categories,
+        },
+        promos
+      );
+
+      res.json({
+        ...mp,
+        originalPrice: priced.originalPrice,
+        price: priced.finalPrice,
+        appliedPromotion: priced.appliedPromotion,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: "حدث خطأ", error: err.message || err });
+    }
+  };
 
 // --- جلب منتجات تاجر حسب القسم/التصنيف
 export const getMerchantProductsByCategory = async (

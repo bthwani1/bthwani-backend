@@ -10,6 +10,8 @@ export interface IMarketer extends Document {
   area?: string;
   status: "active" | "suspended";
   password: string; // bcrypt hash
+  deletedAt?: Date;
+  deletionRequestedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,11 +26,9 @@ const MarketerSchema = new Schema<IMarketer>(
     area: { type: String },
     status: { type: String, enum: ["active", "suspended"], default: "active" },
     password: { type: String, required: true },
+    deletedAt: { type: Date },
+    deletionRequestedAt: { type: Date },
   },
   { timestamps: true }
 );
-
-MarketerSchema.index({ phone: 1 }, { unique: true });
-MarketerSchema.index({ email: 1 }, { unique: true, sparse: true });
-
 export default mongoose.model<IMarketer>("Marketer", MarketerSchema);

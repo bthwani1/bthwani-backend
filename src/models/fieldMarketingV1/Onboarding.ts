@@ -20,13 +20,13 @@ export interface IOnboarding extends Document {
   };
   ownerDraft?: { fullName?: string; phone?: string; email?: string };
   attachments?: { url: string; kind?: string; note?: string }[];
-  participants: { uid: string; role?: "lead" | "support"; weight?: number }[];
+  participants: { marketerId: string; role?: "lead" | "support"; weight?: number }[];
   status: OnbStatus;
   submittedAt?: Date;
   reviewedAt?: Date;
   reviewedBy?: Types.ObjectId;
   notes?: string; // للـ needs_fix أو الرفض
-  createdByUid: string; // منشئ الطلب (المسوّق)
+  createdByMarketerId: string; // منشئ الطلب (المسوّق)
 }
 
 const Sch = new Schema<IOnboarding>(
@@ -54,13 +54,15 @@ const Sch = new Schema<IOnboarding>(
       email: String,
     },
     attachments: [{ url: String, kind: String, note: String }],
-    participants: [
-      {
-        uid: { type: String, required: true },
-        role: { type: String, enum: ["lead", "support"] },
-        weight: { type: Number, min: 0, max: 1 },
-      },
-    ],
+  // Onboarding Schema
+participants: [
+  {
+    marketerId: { type: String, required: true }, // بدل uid
+    role: { type: String, enum: ["lead", "support"] },
+    weight: { type: Number, min: 0, max: 1 },
+  },
+],
+
     status: {
       type: String,
       enum: ["draft", "submitted", "needs_fix", "approved", "rejected"],
@@ -71,9 +73,12 @@ const Sch = new Schema<IOnboarding>(
     reviewedAt: Date,
     reviewedBy: { type: Schema.Types.ObjectId, ref: "User" },
     notes: String,
-    createdByUid: { type: String, required: true, index: true },
+    createdByMarketerId: { type: String, required: true, index: true }, // بدل createdByUid
   },
   { timestamps: true }
 );
 
 export default model<IOnboarding>("Onboarding", Sch);
+Sch.index({ "participants.marketerId": 1, createdAt: -1 });
+Sch.index({ status: 1, createdAt: -1 });
+Sch.index({ createdAt: -1 });

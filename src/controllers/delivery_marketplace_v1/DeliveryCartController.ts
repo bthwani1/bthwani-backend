@@ -338,23 +338,130 @@ export const mergeCart = async (req: Request, res: Response) => {
 
 export const getAllCarts = async (_: Request, res: Response) => {
   try {
-    const carts = await DeliveryCart.find().sort({ createdAt: -1 });
-    res.json(carts);
+    // 1) اجلب السلات كـ lean
+    const rawCarts = await DeliveryCart.find().sort({ createdAt: -1 }).lean();
+
+    // 2) جهّز خرائط المستخدمين والمتاجر
+    const userIds = rawCarts.map((c:any) => c.user).filter(Boolean);
+    const users = await User.find({ _id: { $in: userIds } })
+      .select("name email phone")
+      .lean();
+    const userMap: Record<string, any> =
+      Object.fromEntries(users.map((u:any) => [String(u._id), u]));
+
+    const storeIds = Array.from(
+      new Set(
+        rawCarts.flatMap((c:any) => (c.items || []).map((i:any) => String(i.store)).filter(Boolean))
+      )
+    );
+    const stores = await DeliveryStore.find({ _id: { $in: storeIds } })
+      .select("name")
+      .lean();
+    const storeMap: Record<string, any> =
+      Object.fromEntries(stores.map((s:any) => [String(s._id), s]));
+
+    // 3) طبّع الرد إلى الشكل الذي تتوقعه الواجهة
+    const normalized = rawCarts.map((c:any) => {
+      const items = (c.items || []).map((it:any) => ({
+        product: {
+          _id: String(it.productId),
+          name: it.name,
+          image: it.image,
+          price: Number(it.price) || 0,
+        },
+        quantity: Number(it.quantity) || 0,
+      }));
+
+      // متجر على مستوى السلة (إن كانت كل العناصر من نفس المتجر)
+      const uniqueStoreIds = Array.from(new Set((c.items || []).map((it:any) => String(it.store))));
+      const cartStore =
+        uniqueStoreIds.length === 1
+          ? {
+              _id: uniqueStoreIds[0],
+              name: storeMap[uniqueStoreIds[0] as string]?.name,
+            }
+          : undefined;
+
+      return {
+        _id: String(c._id),
+        user: userMap[String(c.user)] || undefined, // {name,email,phone} إن وجد
+        items,
+        store: cartStore, // قد تكون undefined لو متاجر متعددة
+        total: Number(c.total) || 0,
+        createdAt: c.createdAt, // تُرسل كـ ISO من Mongoose
+      };
+    });
+
+    res.json(normalized);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
 };
+
 export const getAbandonedCarts = async (_: Request, res: Response) => {
   try {
     const THIRTY_MINUTES_AGO = new Date(Date.now() - 30 * 60 * 1000);
-    const carts = await DeliveryCart.find({
+    const rawCarts = await DeliveryCart.find({
       createdAt: { $lt: THIRTY_MINUTES_AGO },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // نفس خطوات التطبيع أعلاه
+    const userIds = rawCarts.map((c:any) => c.user).filter(Boolean);
+    const users = await User.find({ _id: { $in: userIds } })
+      .select("name email phone")
+      .lean();
+    const userMap: Record<string, any> =
+      Object.fromEntries(users.map((u:any) => [String(u._id), u]));
+
+    const storeIds = Array.from(
+      new Set(
+        rawCarts.flatMap((c:any) => (c.items || []).map((i:any) => String(i.store)).filter(Boolean))
+      )
+    );
+    const stores = await DeliveryStore.find({ _id: { $in: storeIds } })
+      .select("name")
+      .lean();
+    const storeMap: Record<string, any> =
+      Object.fromEntries(stores.map((s:any) => [String(s._id), s]));
+
+    const normalized = rawCarts.map((c:any) => {
+      const items = (c.items || []).map((it:any) => ({
+        product: {
+          _id: String(it.productId),
+          name: it.name,
+          image: it.image,
+          price: Number(it.price) || 0,
+        },
+        quantity: Number(it.quantity) || 0,
+      }));
+
+      const uniqueStoreIds = Array.from(new Set((c.items || []).map((it:any) => String(it.store))));
+      const cartStore =
+        uniqueStoreIds.length === 1
+          ? {
+              _id: uniqueStoreIds[0],
+              name: storeMap[uniqueStoreIds[0] as string]?.name,
+            }
+          : undefined;
+
+      return {
+        _id: String(c._id),
+        user: userMap[String(c.user)] || undefined,
+        items,
+        store: cartStore,
+        total: Number(c.total) || 0,
+        createdAt: c.createdAt,
+      };
     });
-    res.json(carts);
+
+    res.json(normalized);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
 };
+
 export const getDeliveryFee = async (req: Request, res: Response) => {
   try {
     const { addressId, deliveryMode = "split", cartId } = req.query as any;

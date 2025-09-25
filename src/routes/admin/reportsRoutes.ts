@@ -6,10 +6,10 @@ const x = Router();
 /**
  * @swagger
  * tags:
- *  - name: Admin-Reports
+ *  - name: Reports
  *    description: تقارير أداء المسوّقين
  */
 x.use(verifyMarketerJWT);
-x.get("reports/marketers/overview", r.overview);
-x.get("reports/marketers/:id", r.perMarketer);
+x.get("/overview", r.overview);
+x.get("/:id", r.perMarketer);
 export default x;
