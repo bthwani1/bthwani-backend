@@ -34,7 +34,7 @@ r.post("/events", optionalFirebase, async (req, res) => {
 });
 
 // KPIs أساسية
-r.get("/marketing/kpis", async (req, res) => {
+r.get("/kpis", async (req, res) => {
   const from = req.query.from
     ? new Date(String(req.query.from))
     : new Date(Date.now() - 30 * 864e5);

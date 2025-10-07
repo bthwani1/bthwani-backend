@@ -1,6 +1,5 @@
 // routes/admin/drivers.finance.ts
 import { Router } from "express";
-import { z } from "zod";
 
 import DriverAdjustment from "../../models/Driver_app/DriverAdjustment";
 import DriverPayoutCycle from "../../models/Driver_app/DriverPayoutCycle";
@@ -13,7 +12,7 @@ r.post("/:id/adjustments", async (req, res) => {
     type: req.body.type,
     amount: req.body.amount,
     reason: req.body.reason,
-    createdBy: req.user?.id || req.user?.email || "system",
+    createdBy: (req.user as any)?.id || (req.user as any)?.email || "system",
   });
   res.json(a);
 });

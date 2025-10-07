@@ -13,17 +13,17 @@ const router = Router();
 
 // إنشاء متجر جديد بواسطة المسوّق (غير مفعّل + مغلق بالقوة حتى يفعّله الأدمن)
 router.post(
-  "/marketer/stores",
+  "/stores",
   verifyMarketerJWT,
   controller.createStoreByMarketer
 );
 
 // جلب متاجري التي أنشأتها أنا (اختياري للموبايل)
-router.get("/marketer/stores", verifyMarketerJWT, controller.listMyStores);
+router.get("/stores", verifyMarketerJWT, controller.listMyStores);
 
 // إنشاء تاجر مربوط بمتجر أنشأه المسوّق (غير مفعّل افتراضيًا)
 router.post(
-  "/marketer/vendors",
+  "/vendors",
   verifyMarketerJWT,
   controller.createVendorByMarketer
 );

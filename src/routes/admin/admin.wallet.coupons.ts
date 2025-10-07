@@ -11,16 +11,17 @@ import {
 } from "../../controllers/admin/wallet.admin.controller";
 import { adminCreditWallet } from "../../controllers/admin/wallet.admin.controller";
 import { adminDebitWallet } from "../../controllers/admin/wallet.admin.controller";
+import { verifyFirebase } from "../../middleware/verifyFirebase";
 
 const r = Router();
 
 // كوبونات
-r.post("/admin/coupons", verifyAdmin, createCoupon);
-r.get("/admin/coupons", verifyAdmin, listCoupons);
+r.post("/coupons", verifyFirebase, verifyAdmin, createCoupon);
+r.get("/coupons", verifyFirebase, verifyAdmin, listCoupons);
 
 // محفظة
-r.get("/admin/users/search", verifyAdmin, searchUsers);
-r.post("/admin/wallet/credit", verifyAdmin, adminCreditWallet);
-r.post("/admin/wallet/debit", verifyAdmin, adminDebitWallet);
+r.get("/users/search", verifyFirebase, verifyAdmin, searchUsers);
+r.post("/credit", verifyFirebase, verifyAdmin, adminCreditWallet);
+r.post("/debit", verifyFirebase, verifyAdmin, adminDebitWallet);
 
 export default r;

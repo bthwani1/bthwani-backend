@@ -29,7 +29,7 @@ const previewBody = z.object({ rules: z.array(ruleSchema).min(1) });
 const router = express.Router();
 
 // POST /segments/preview — يرجّع العدد وعينة IDs
-router.post('/segments/preview', writeLimiter, validate({ body: previewBody }), async (req, res, next) => {
+router.post('/preview', writeLimiter, validate({ body: previewBody }), async (req, res, next) => {
   try {
     const pipeline = buildUserPipeline(req.body.rules);
     const coll = mongoose.connection.collection('users');
@@ -46,7 +46,7 @@ router.post('/segments/preview', writeLimiter, validate({ body: previewBody }), 
 });
 
 // POST /segments/sync — يحفظ الشريحة ويحدّث أعضاءها لو static
-router.post('/segments/sync', writeLimiter, validate({ body: segmentBody }), async (req, res, next) => {
+router.post('/sync', writeLimiter, validate({ body: segmentBody }), async (req, res, next) => {
   try {
     const { name, rules, dynamic } = req.body;
     const seg = await Segment.findOneAndUpdate(

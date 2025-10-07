@@ -8,13 +8,13 @@ import {
 
 const router = Router();
 router.patch(
-  "/admin/activation/store/:storeId",
+  "/store/:storeId",
   verifyFirebase,
   verifyAdmin,
   activateStore
 );
 router.patch(
-  "/admin/activation/vendor/:vendorId",
+  "/vendor/:vendorId",
   verifyFirebase,
   verifyAdmin,
   activateVendor

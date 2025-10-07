@@ -6,7 +6,11 @@ import {
   registerAdmin,
   loginAdmin,
   getAdmins,
+  getAdminById,
   updatePermissions,
+  updateAdmin,
+  updateAdminStatus,
+  deleteAdmin,
 } from "../../controllers/admin/adminUsersController";
 
 import { ModuleName } from "../../models/admin/AdminUser";
@@ -38,7 +42,23 @@ router.post(
 // 3. Get list of all admins
 router.get("/", getAdmins);
 
-// 4. Update permissions for a given admin
+// 4. Get admin by ID
+router.get("/:id", [param("id").isMongoId()], getAdminById);
+
+// 5. Update admin
+router.put("/:id", [param("id").isMongoId()], updateAdmin);
+
+// 6. Update admin status (activate/deactivate)
+router.patch(
+  "/:id/status",
+  [
+    param("id").isMongoId(),
+    body("isActive").isBoolean(),
+  ],
+  updateAdminStatus
+);
+
+// 7. Update permissions for a given admin
 router.put(
   "/:id/permissions",
   [
@@ -53,5 +73,8 @@ router.put(
   ],
   updatePermissions
 );
+
+// 8. Delete admin
+router.delete("/:id", [param("id").isMongoId()], deleteAdmin);
 
 export default router;

@@ -7,7 +7,7 @@ const CounterSchema = new Schema({
   seq:  { type: Number, required: true, default: 0 },
 }, { timestamps: true });
 
-export const Counter = model('Counter', CounterSchema);
+export const Counter = model('ERCounter', CounterSchema);
 
 // يعيد الرقم التالي مثل: JV-2025-000001
 export async function nextVoucherNo() {

@@ -348,7 +348,7 @@ r.post(
     if (m.reply)
       await TicketMessage.create({
         ticketId: t._id,
-        author: { type: "agent", id: req.user?.email || "agent" },
+        author: { type: "agent", id: (req.user as any)?.email || "agent" },
         isInternalNote: !!m.internal,
         body: m.reply,
       });

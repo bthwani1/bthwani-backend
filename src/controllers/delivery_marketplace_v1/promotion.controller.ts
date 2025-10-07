@@ -16,6 +16,60 @@ export const createPromotion = async (req: Request, res: Response) => {
   }
 };
 
+// Admin: get all promotions with optional status filter
+export const getAllPromotionsAdmin = async (req: Request, res: Response) => {
+  try {
+    const {
+      status = "all",         // all | active | expired | upcoming | inactive
+      placement,              // comma-separated
+      target,                 // product | store | category
+      store, product, category
+    } = req.query as any;
+
+    const now = new Date();
+    const q: any = {};
+
+    // حالة العرض
+    if (status !== "all") {
+      if (status === "active") {
+        q.isActive = true;
+        q.$or = [
+          { startDate: { $exists: false }, endDate: { $exists: false } },
+          { startDate: { $lte: now }, endDate: { $exists: false } },
+          { startDate: { $exists: false }, endDate: { $gte: now } },
+          { startDate: { $lte: now }, endDate: { $gte: now } },
+        ];
+      } else if (status === "expired") {
+        q.endDate = { $lt: now };
+      } else if (status === "upcoming") {
+        q.startDate = { $gt: now };
+      } else if (status === "inactive") {
+        q.isActive = false;
+      }
+    }
+
+    // فلاتر اختيارية
+    if (placement) q.placements = { $in: String(placement).split(",").map(s => s.trim()).filter(Boolean) };
+    if (target) q.target = String(target);
+    if (store) q.store = store;
+    if (product) q.product = product;
+    if (category) q.category = category;
+
+    const list = await Promotion.find(q)
+      .sort({ order: 1, createdAt: -1 })
+      .populate([
+        { path: "product", select: "name image price" },
+        { path: "store", select: "name" },
+        { path: "category", select: "name" },
+      ])
+      .lean();
+
+    res.json(list);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // Get all (للعميل وغير المسؤول)
 export const getActivePromotions = async (req: Request, res: Response) => {
   try {

@@ -6,8 +6,8 @@ import { User } from "../../models/user";
 const r = Router();
 
 // add item
-r.post("/shein/cart/add", async (req, res) => {
-  const uid = req.user?.id;
+r.post("/cart/add", async (req, res) => {
+  const uid = (req.user as any)?.id;
   if (!uid) {
     res.status(401).json({ message: "Unauthorized" });
     return;
@@ -32,8 +32,8 @@ r.post("/shein/cart/add", async (req, res) => {
 });
 
 // get cart
-r.get("/shein/cart", async (req, res) => {
-  const uid = req.user?.id;
+r.get("/cart", async (req, res) => {
+  const uid = (req.user as any)?.id;
   if (!uid) {
     res.status(401).json({ message: "Unauthorized" });
     return;
@@ -44,8 +44,8 @@ r.get("/shein/cart", async (req, res) => {
 });
 
 // clear
-r.delete("/shein/cart", async (req, res) => {
-  const uid = req.user?.id;
+r.delete("/cart", async (req, res) => {
+  const uid = (req.user as any)?.id;
   if (!uid) {
     res.status(401).json({ message: "Unauthorized" });
     return;
@@ -54,8 +54,8 @@ r.delete("/shein/cart", async (req, res) => {
   await SheinCart.deleteOne({ user: user!._id });
   res.json({ ok: true });
 });
-r.patch("/shein/cart/item/:id", async (req, res) => {
-  const uid = req.user?.id;
+r.patch("/cart/item/:id", async (req, res) => {
+  const uid = (req.user as any)?.id;
   if (!uid) {
     res.status(401).json({ message: "Unauthorized" });
     return;
@@ -83,8 +83,8 @@ r.patch("/shein/cart/item/:id", async (req, res) => {
 });
 
 // DELETE عنصر واحد
-r.delete("/shein/cart/item/:id", async (req, res) => {
-  const uid = req.user?.id;
+  r.delete("/cart/item/:id", async (req, res) => {
+  const uid = (req.user as any)?.id;
   if (!uid) {
     res.status(401).json({ message: "Unauthorized" });
     return;

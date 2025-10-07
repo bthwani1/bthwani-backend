@@ -45,7 +45,10 @@ export const addOrUpdateCart = async (req: Request, res: Response) => {
         name, price, quantity, store: itemStoreId || itemStore, image,
       }];
     }
-    if (!itemsArr?.length) return res.status(400).json({ message: "items مطلوبة" });
+    if (!itemsArr?.length) {
+      res.status(400).json({ message: "items مطلوبة" });
+      return;
+    }
 
     const toObjectId = (v:any) =>
       typeof v === "string" && mongoose.Types.ObjectId.isValid(v)
@@ -67,12 +70,16 @@ export const addOrUpdateCart = async (req: Request, res: Response) => {
       }))
       .filter((i:any) => i.productId && i.store);
 
-    if (!itemsMapped.length) return res.status(400).json({ message: "items غير صالحة" });
+    if (!itemsMapped.length) {
+       res.status(400).json({ message: "items غير صالحة" });
+      return;
+    } 
 
     // لا تسمح في نفس الطلب بأكثر من متجر جديد (لتبسيط القرار)
     const newStores = Array.from(new Set(itemsMapped.map((i:any) => String(i.store))));
     if (newStores.length > 1) {
-      return res.status(400).json({ message: "أرسل متجرًا واحدًا في كل إضافة" });
+      res.status(400).json({ message: "أرسل متجرًا واحدًا في كل إضافة" });
+      return;
     }
     const newStoreId = newStores[0];
 
@@ -101,7 +108,8 @@ export const addOrUpdateCart = async (req: Request, res: Response) => {
 
         const newStore = byId[newStoreId as string];
         if (!newStore?.location) {
-          return res.status(404).json({ message: "المتجر غير موجود" });
+          res.status(404).json({ message: "المتجر غير موجود" });
+          return;
         }
 
         // أقل مسافة بين المتجر الجديد وكل متجر موجود
@@ -117,7 +125,7 @@ export const addOrUpdateCart = async (req: Request, res: Response) => {
         }
 
         if (!isFinite(minKm) || minKm > NEAR_STORE_KM) {
-          return res.status(409).json({
+          res.status(409).json({
             code: "CART_STORE_TOO_FAR",
             message: "لا يمكن خلط متاجر بعيدة ضمن نفس السلة",
             nearestDistanceKm: isFinite(minKm) ? +minKm.toFixed(2) : null,
@@ -125,6 +133,7 @@ export const addOrUpdateCart = async (req: Request, res: Response) => {
             currentStores: existingStoreIds,
             newStore: newStoreId,
           });
+          return;
         }
       }
     }
@@ -168,7 +177,7 @@ export const updateCartItemQuantity = async (req: Request, res: Response) => {
   try {
     const firebaseUID = (req as any).user?.id;
     if (!firebaseUID) {
-      res.status(401).json({ message: "Unauthorized" });
+          res.status(401).json({ message: "Unauthorized" });
       return;
     }
 

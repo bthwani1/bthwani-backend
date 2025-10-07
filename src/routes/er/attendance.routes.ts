@@ -1,17 +1,24 @@
 // server/src/routes/attendance.routes.ts
-import { Router } from 'express';
+import { Router } from "express";
 import {
   getAttendance,
+  getTodayAttendance,
+  getDeductions,
   recordAttendance,
-} from '../../controllers/er/attendance.controller';
-import { Request, Response } from 'express';
-import { Deduction } from '../../models/er/deduction.model';
+} from "../../controllers/er/attendance.controller"; // تأكد أن المسار صحيح
 
 const router = Router();
-router.get('/', getAttendance);
-router.get('/', async (req: Request, res: Response) => {
-  const list = await Deduction.find({ employee: req.query.employee });
-  res.json(list);
-});
-router.post('/', recordAttendance);
+
+// سجلات الحضور (فلترة بـ employee اختياري)
+router.get("/", getAttendance);
+
+// حضور اليوم الحالي
+router.get("/today", getTodayAttendance);
+
+// خصومات الموظف (اختياري)
+router.get("/deductions", getDeductions);
+
+// تسجيل حضور/غياب
+router.post("/", recordAttendance);
+
 export default router;

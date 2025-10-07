@@ -1,83 +1,64 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import Onboarding from "../../models/fieldMarketingV1/Onboarding";
 
 function dt(s?: string) {
   return s ? new Date(s) : undefined;
 }
 
-export async function overview(req: Request, res: Response) {
-  const { from, to } = req.query as any;
-  const match: any = {};
-  if (from || to) match.createdAt = {};
-  if (from) match.createdAt.$gte = dt(from);
-  if (to) match.createdAt.$lte = dt(to);
+export async function overview(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { from, to } = req.query as { from?: string; to?: string };
+    const match: any = {};
+    const fromD = from ? new Date(from) : undefined;
+    const toD = to ? new Date(to) : undefined;
+    if ((fromD && !isNaN(+fromD)) || (toD && !isNaN(+toD))) {
+      match.createdAt = {};
+      if (fromD && !isNaN(+fromD)) match.createdAt.$gte = fromD;
+      if (toD && !isNaN(+toD)) match.createdAt.$lte = toD;
+    }
 
-  const base = await Onboarding.aggregate([
-    { $match: match },
-    { $unwind: "$participants" },
-    {
-      $group: {
-        _id: "$participants.marketerId",
-        submittedW: {
-          $sum: {
-            $cond: [
-              { $eq: ["$status", "submitted"] },
-              { $ifNull: ["$participants.weight", 0.5] },
-              0,
-            ],
+    const base = await Onboarding.aggregate([
+      { $match: match },
+      { $unwind: "$participants" },
+      {
+        $group: {
+          _id: "$participants.marketerId",
+          submittedW: {
+            $sum: { $cond: [{ $eq: ["$status", "submitted"] }, { $ifNull: ["$participants.weight", 0.5] }, 0] },
           },
-        },
-        approvedW: {
-          $sum: {
-            $cond: [
-              { $eq: ["$status", "approved"] },
-              { $ifNull: ["$participants.weight", 0.5] },
-              0,
-            ],
+          approvedW: {
+            $sum: { $cond: [{ $eq: ["$status", "approved"] }, { $ifNull: ["$participants.weight", 0.5] }, 0] },
           },
-        },
-        rejectedW: {
-          $sum: {
-            $cond: [
-              { $eq: ["$status", "rejected"] },
-              { $ifNull: ["$participants.weight", 0.5] },
-              0,
-            ],
+          rejectedW: {
+            $sum: { $cond: [{ $eq: ["$status", "rejected"] }, { $ifNull: ["$participants.weight", 0.5] }, 0] },
           },
-        },
-        needsFixW: {
-          $sum: {
-            $cond: [
-              { $eq: ["$status", "needs_fix"] },
-              { $ifNull: ["$participants.weight", 0.5] },
-              0,
-            ],
+          needsFixW: {
+            $sum: { $cond: [{ $eq: ["$status", "needs_fix"] }, { $ifNull: ["$participants.weight", 0.5] }, 0] },
           },
         },
       },
-    },
-    {
-      $project: {
-        marketerId: "$._id",
-        _id: 0,
-        submittedW: 1,
-        approvedW: 1,
-        rejectedW: 1,
-        needsFixW: 1,
-        approvalRate: {
-          $cond: [
-            { $gt: ["$submittedW", 0] },
-            { $divide: ["$approvedW", "$submittedW"] },
-            0,
-          ],
+      {
+        $project: {
+          marketerId: "$_id",      // ✅ الصحيح
+          _id: 0,
+          submittedW: { $ifNull: ["$submittedW", 0] },
+          approvedW: { $ifNull: ["$approvedW", 0] },
+          rejectedW: { $ifNull: ["$rejectedW", 0] },
+          needsFixW: { $ifNull: ["$needsFixW", 0] },
+          approvalRate: {
+            $cond: [{ $gt: ["$submittedW", 0] }, { $divide: ["$approvedW", "$submittedW"] }, 0],
+          },
         },
       },
-    },
-    { $sort: { approvedW: -1 } },
-  ]);
+      { $sort: { approvedW: -1 } },
+    ]/* , { allowDiskUse: true } */);
 
-  res.json(base);
+    res.json(base);
+  } catch (err) {
+    next(err);
+  }
 }
+
 
 export async function perMarketer(req: Request, res: Response) {
   const { id } = req.params;

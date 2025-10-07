@@ -23,13 +23,13 @@ router.get("/me", verifyMarketerJWT, me);
  * يطلب حذف الحساب (تذكرة/علامة داخلية)
  * POST /auth/delete-account/request
  */
-router.post("/auth/delete-account/request", verifyMarketerJWT, requestAccountDeletion);
+router.post("/delete-account/request", verifyMarketerJWT, requestAccountDeletion);
 
 /**
  * حذف فوري ذاتي (Soft-delete + إخفاء PII)
  * DELETE /auth/delete-account
  */
-router.delete("/auth/delete-account", verifyMarketerJWT, deleteMyAccountSoft);
+router.delete("/delete-account", verifyMarketerJWT, deleteMyAccountSoft);
 
 
 export default router;

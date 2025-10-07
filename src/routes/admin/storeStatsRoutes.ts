@@ -6,49 +6,70 @@ import DeliveryProduct from "../../models/delivery_marketplace_v1/DeliveryProduc
 
 const router = Router();
 
-router.get("/delivery/stores/:storeId/stats/:period", async (req, res) => {
+router.get("/:storeId/stats/:period", async (req, res) => {
   const { storeId, period } = req.params as {
     storeId: string;
     period: "daily" | "weekly" | "monthly" | "all";
   };
 
-  // helper لحساب تاريخ البداية
   const now = new Date();
   let start: Date | undefined;
+
   if (period === "daily") {
     start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   } else if (period === "weekly") {
-    const day = now.getDay();
+    const day = now.getDay(); // 0 = Sunday (عدّل حسب أسبوعك)
     start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
   } else if (period === "monthly") {
     start = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else {
+    start = undefined; // all
   }
 
-  const filter: any = { store: new Types.ObjectId(storeId) };
-  if (start) filter.createdAt = { $gte: start };
+  const storeObjectId = new Types.ObjectId(storeId);
 
-  // عدّ المنتجات
-  const productsCount = await DeliveryProduct.countDocuments(filter);
+  try {
+    // عدد المنتجات في المتجر
+    const productsCount = await DeliveryProduct.countDocuments({
+      store: storeObjectId,
+      ...(start ? { createdAt: { $gte: start } } : {}),
+    });
 
-  // عدّ الطلبات
-  const ordersCount = await Order.countDocuments({
-    "store._id": new Types.ObjectId(storeId),
-    ...(start ? { createdAt: { $gte: start } } : {}),
-  });
+    // عدد الطلبات التي تحتوي عناصر من هذا المتجر
+    const ordersMatch: any = {
+      "items.store": storeObjectId,
+      ...(start ? { createdAt: { $gte: start } } : {}),
+    };
 
-  // إجمالي الإيرادات من الطلبات (مجموعة)
-  const revenueAgg = await Order.aggregate([
-    {
-      $match: {
-        "store._id": new Types.ObjectId(storeId),
-        ...(start ? { createdAt: { $gte: start } } : {}),
+    const ordersCountAgg = await Order.aggregate([
+      { $match: ordersMatch },
+      { $count: "count" },
+    ]);
+    const ordersCount = ordersCountAgg[0]?.count ?? 0;
+
+    // إيراد هذا المتجر فقط (من عناصره)
+    // نفترض أن الإيراد = sum(items.unitPrice * items.quantity) لعناصر هذا المتجر
+    const revenueAgg = await Order.aggregate([
+      { $match: ordersMatch },
+      { $unwind: "$items" },
+      { $match: { "items.store": storeObjectId } },
+      {
+        $group: {
+          _id: null,
+          total: {
+            $sum: { $multiply: ["$items.unitPrice", "$items.quantity"] },
+          },
+        },
       },
-    },
-    { $group: { _id: null, total: { $sum: "$cost" } } },
-  ]);
-  const totalRevenue = revenueAgg[0]?.total ?? 0;
+    ]);
+    const totalRevenue = revenueAgg[0]?.total ?? 0;
 
-  res.json({ productsCount, ordersCount, totalRevenue });
+    res.json({ productsCount, ordersCount, totalRevenue });
+    return;
+  } catch (e: any) {
+    res.status(500).json({ message: e.message || "Server error" });
+    return;
+  }
 });
 
 export default router;

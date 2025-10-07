@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { verifyFirebase } from "../middleware/verifyFirebase";
 import { ensureOwner } from "../middleware/ensureOwner";
-import SupportTicket from "../models/SupportTicket";
+import SupportTicket from "../models/support/SupportTicket";
 import Message from "../models/MessageSupport";
 import MessageSupport from "../models/MessageSupport";
 import { io } from "../index"; // تصدّره من src/index.ts
@@ -13,7 +13,7 @@ const r = Router();
 // تذاكري (أحدثها أولاً)
 r.get("/tickets/my", verifyFirebase, async (req: any, res) => {
   const uid = req.user.uid;
-  const tickets = await SupportTicket.find({ userId: uid })
+  const tickets = await SupportTicket.find({ "requester.userId": uid })
     .sort({ lastMessageAt: -1 })
     .limit(100)
     .lean();
@@ -30,7 +30,7 @@ r.post("/tickets", verifyFirebase, async (req: any, res) => {
     .parse(req.body);
 
   const t = await SupportTicket.create({
-    userId: req.user.uid,
+    requester: { userId: req.user.uid },
     subject: body.subject,
     status: "open",
     lastMessageAt: new Date(),
@@ -55,7 +55,7 @@ r.post("/tickets", verifyFirebase, async (req: any, res) => {
     ticketId: String(t._id),
     ...payload,
   });
-  await sendSupportPush(t.userId, msg.text || "لديك رسالة جديدة من الدعم");
+  await sendSupportPush(t.requester.userId, msg.text || "لديك رسالة جديدة من الدعم");
 
   res.status(201).json(t);
 });

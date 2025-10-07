@@ -89,7 +89,7 @@ router.post(
 
 // POST /messages/schedule — فقط إنشاء رسالة مجدولة
 router.post(
-  "/messages/schedule",
+  "/schedule",
   writeLimiter,
   validate({ body: sendSchema.extend({ scheduleAt: z.string().datetime() }) }),
   async (req, res, next) => {

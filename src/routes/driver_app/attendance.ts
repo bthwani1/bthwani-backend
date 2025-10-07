@@ -3,7 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import dayjs from "dayjs";
 import DriverAttendanceSession from "../../models/Driver_app/DriverAttendanceSession";
-import { validate, validate2 } from "../../middleware/validate";
+import {  validate2 } from "../../middleware/validate";
 import { requireDriverSelf } from "../../middleware/driverGuard";
 import DriverDocument from "../../models/Driver_app/DriverDocument";
 
@@ -33,7 +33,7 @@ r.post("/:id/docs",
       res.json(d);
   });
 r.post(
-  "/:id/attendance/check-in",
+  "/:id/check-in",
   requireDriverSelf,
   validate2(CheckInSchema),
   async (req: any, res) => {
@@ -61,7 +61,7 @@ const CheckOutSchema = z.object({
   body: z.object({ lat: z.number(), lng: z.number() }),
 });
 r.post(
-  "/:id/attendance/check-out",
+  "/:id/check-out",
   requireDriverSelf,
   validate2(CheckOutSchema),
   async (req: any, res) => {
@@ -82,7 +82,7 @@ r.post(
   }
 );
 
-r.get("/:id/attendance/daily", requireDriverSelf, async (req: any, res) => {
+r.get("/:id/daily", requireDriverSelf, async (req: any, res) => {
   // يُفضّل توفير aggregation من DriverAttendanceDaily
   // (يمكنك لاحقًا إضافة تجميعة حسب from/to)
   // Placeholder: رجّع آخر 30 يومًا من DriverAttendanceDaily

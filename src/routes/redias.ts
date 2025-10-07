@@ -6,7 +6,7 @@ const client = new IORedis(process.env.REDIS_URL!, {
   tls: process.env.REDIS_TLS === "true" ? {} : undefined,
 });
 
-r.get("/admin/debug/redis", async (_req, res) => {
+r.get("/", async (_req, res) => {
   try {
     await client.set("bthwani:test", String(Date.now()), "EX", 60);
     const v = await client.get("bthwani:test");

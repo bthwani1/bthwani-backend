@@ -4,6 +4,7 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { AdminUser, AdminRole, ModuleName, ModulePermissions } from '../../models/admin/AdminUser';
+import { body, param } from 'express-validator';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 const TOKEN_EXPIRY = '1d'; // مدة صلاحية التوكن
@@ -105,9 +106,145 @@ export const updatePermissions = async (req: Request, res: Response) => {
     ).select('-password');
 
     if (!updated) {
- res.status(404).json({ message: 'Admin not found' });
-        return;
+      res.status(404).json({ message: 'Admin not found' });
+      return;
     }
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// جلب مسؤول واحد بالـ ID
+export const getAdminById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const admin = await AdminUser.findById(id).select('-password');
+
+    if (!admin) {
+      res.status(404).json({ message: 'Admin not found' });
+      return;
+    }
+
+    res.json(admin);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// حذف مسؤول
+export const deleteAdmin = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // منع حذف آخر SuperAdmin
+    const admin = await AdminUser.findById(id);
+    if (!admin) {
+      res.status(404).json({ message: 'Admin not found' });
+      return;
+    }
+
+    if (admin.roles.includes(AdminRole.SUPERADMIN)) {
+      const superAdminCount = await AdminUser.countDocuments({
+        roles: AdminRole.SUPERADMIN,
+        _id: { $ne: id }
+      });
+
+      if (superAdminCount === 0) {
+        res.status(400).json({ message: 'Cannot delete last SuperAdmin' });
+        return;
+      }
+    }
+
+    await AdminUser.findByIdAndDelete(id);
+    res.json({ message: 'Admin deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// تحديث حالة المسؤول (تفعيل/تعطيل)
+export const updateAdminStatus = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    if (typeof isActive !== 'boolean') {
+      res.status(400).json({ message: 'isActive must be boolean' });
+      return;
+    }
+
+    const admin = await AdminUser.findById(id);
+    if (!admin) {
+      res.status(404).json({ message: 'Admin not found' });
+      return;
+    }
+
+    // منع تعطيل آخر SuperAdmin
+    if (!isActive && admin.roles.includes(AdminRole.SUPERADMIN)) {
+      const activeSuperAdminCount = await AdminUser.countDocuments({
+        roles: AdminRole.SUPERADMIN,
+        isActive: true,
+        _id: { $ne: id }
+      });
+
+      if (activeSuperAdminCount === 0) {
+        res.status(400).json({ message: 'Cannot deactivate last active SuperAdmin' });
+        return;
+      }
+    }
+
+    const updated = await AdminUser.findByIdAndUpdate(
+      id,
+      { isActive },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// تحديث مسؤول كامل
+export const updateAdmin = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, email, roles, permissions, isActive } = req.body;
+
+    // تصفية الأدوار
+    const validRoles = Array.isArray(roles)
+      ? roles.filter((r: string) => Object.values(AdminRole).includes(r as AdminRole))
+      : undefined;
+
+    // تصفية الصلاحيات
+    const validPerms: Partial<Record<ModuleName, ModulePermissions>> = {};
+    if (permissions && typeof permissions === 'object') {
+      for (const key of Object.keys(permissions)) {
+        if (Object.values(ModuleName).includes(key as ModuleName)) {
+          validPerms[key as ModuleName] = permissions[key];
+        }
+      }
+    }
+
+    const updateData: any = {};
+    if (name !== undefined) updateData.username = name;
+    if (email !== undefined) updateData.username = email; // استخدام email كـ username مؤقتاً
+    if (validRoles !== undefined) updateData.roles = validRoles;
+    if (Object.keys(validPerms).length > 0) updateData.permissions = validPerms;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
+    const updated = await AdminUser.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!updated) {
+      res.status(404).json({ message: 'Admin not found' });
+      return;
+    }
+
     res.json(updated);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });

@@ -9,7 +9,7 @@ import DriverAttendanceDaily from "../../models/Driver_app/DriverAttendanceDaily
 const r = Router();
 
 // قائمة حضور اليوم حسب الحالة
-r.get("/attendance", async (req, res) => {
+r.get("/", async (req, res) => {
   const day = (req.query.day as string) || dayjs().format("YYYY-MM-DD");
   const status = req.query.status as string; // online_now / absent / attended
   // تبسيط: online_now = يوجد session مفتوحة
@@ -29,7 +29,7 @@ r.get("/attendance", async (req, res) => {
 // Force-close
 
 r.patch(
-  "/attendance/sessions/:sessionId/force-close",
+  "/sessions/:sessionId/force-close",
 
   async (req, res) => {
     const s = await DriverAttendanceSession.findById(req.params.sessionId);

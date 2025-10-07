@@ -5,23 +5,17 @@ import { verifyAdmin } from "../../middleware/verifyAdmin";
 
 const r = Router();
 
-/**
- * @swagger
- * tags:
- *   - name: Admin-Vendors
- *     description: إدارة وتفعيل حسابات التجّار
- */
 r.use(verifyFirebase, verifyAdmin);
 
-r.get("/admin/vendors", c.list);
-r.get("/admin/vendors/:id", c.getOne);
-r.get("/admin/stores/:storeId/vendors", c.listByStore);
+r.get("/", c.list);
+r.get("/:id", c.getOne);
+r.get("/stores/:storeId/vendors", c.listByStore);
 
-r.post("/admin/vendors/:id/activate", c.activate);
-r.post("/admin/vendors/:id/deactivate", c.deactivate);
-r.patch("/admin/vendors/:id", c.update);
-r.post("/admin/vendors/:id/reset-password", c.resetPassword);
+r.post("/:id/activate", c.activate);
+r.post("/:id/deactivate", c.deactivate);
+r.patch("/:id", c.update);
+r.post("/:id/reset-password", c.resetPassword);
 
-r.delete("/admin/vendors/:id", c.remove);
+r.delete("/:id", c.remove);
 
 export default r;

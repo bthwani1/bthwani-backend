@@ -11,9 +11,9 @@ const r = Router();
  *    description: إدارة خطط الحوافز
  */
 r.use(verifyFirebase, verifyAdmin);
-r.get("/v1/commission-plans", c.list);
-r.post("/v1/commission-plans", c.create);
-r.patch("/v1/commission-plans/:id", c.patch);
-r.post("/v1/commission-plans/:id/status", c.setStatus);
-r.delete("/v1/commission-plans/:id", c.remove);
+r.get("/", c.list);
+r.post("/", c.create);
+r.patch("/:id", c.patch);
+r.post("/:id/status", c.setStatus);
+r.delete("/:id", c.remove);
 export default r;

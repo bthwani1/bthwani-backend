@@ -1,7 +1,7 @@
 // routes/admin/drivers.shifts.ts
 import { Router } from "express";
 import { z } from "zod";
-import { validate, validate2 } from "../../middleware/validate";
+import {  validate2 } from "../../middleware/validate";
 import { requireRole } from "../../middleware/rbac";
 import DriverShift from "../../models/Driver_app/DriverShift";
 import DriverShiftAssignment from "../../models/Driver_app/DriverShiftAssignment";

@@ -27,6 +27,7 @@ const WalletTransactionSchema = new mongoose.Schema({
   }, // وسّعناها
 
   description: String,
+  transactions: String,
   bankRef: String,
   meta: mongoose.Schema.Types.Mixed,
   createdAt: { type: Date, default: Date.now },

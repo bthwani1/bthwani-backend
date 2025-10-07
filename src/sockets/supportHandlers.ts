@@ -1,4 +1,4 @@
-import SupportTicket from "../models/SupportTicket";
+import SupportTicket from "../models/support/SupportTicket";
 
 export async function handleSupportJoin(socket: any, ticketId: string) {
   const uid: string | undefined = socket.data.uid;
@@ -8,7 +8,7 @@ export async function handleSupportJoin(socket: any, ticketId: string) {
   const t = await SupportTicket.findById(ticketId).lean();
   if (!t) return;
 
-  const isOwner = t.userId === uid;
+  const isOwner = t.requester.userId === uid;
   const isStaff = ["admin", "superadmin", "agent", "support"].includes(role);
   if (!isOwner && !isStaff) return;
 

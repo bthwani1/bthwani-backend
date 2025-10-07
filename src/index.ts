@@ -21,7 +21,6 @@ import driverWithdrawalRoutes from "./routes/driver_app/driver.withdrawal.routes
 import vendorRoutes from "./routes/vendor_app/vendor.routes";
 import settlementRoutes from "./routes/vendor_app/settlement.routes";
 import storeStatsRoutes from "./routes/admin/storeStatsRoutes";
-import adminNotificationTestRoutes from "./routes/admin/admin.notifications.test";
 import deliveryCategoryRoutes from "./routes/delivery_marketplace_v1/DeliveryCategoryRoutes";
 import deliveryStoreRoutes from "./routes/delivery_marketplace_v1/DeliveryStoreRoutes";
 import deliveryProductRoutes from "./routes/delivery_marketplace_v1/DeliveryProductRoutes";
@@ -75,6 +74,46 @@ import walletRoutes from "./routes/Wallet_V8/wallet.routes";
 import metaRoutes from "./routes/meta";
 import adminCmsRoutes from "./routes/admin/admin.cms.routes";
 import cmsRoutes from "./routes/cms.routes";
+import dashboardOverviewRoutes from "./routes/admin/dashboardOverview.routes";
+
+// Missing route imports
+import adminWalletCouponsRoutes from "./routes/admin/admin.wallet.coupons";
+import adminUsersRoutes from "./routes/admin/adminUsersRoutes";
+import driversAssetsRoutes from "./routes/admin/drivers.assets";
+import driversAttendanceRoutes from "./routes/admin/drivers.attendance";
+import driversDocsRoutes from "./routes/admin/drivers.docs";
+import driversFinanceRoutes from "./routes/admin/drivers.finance";
+import driversShiftsRoutes from "./routes/admin/drivers.shifts";
+import adminNotificationRoutes2 from "./routes/admin/notification.routes";
+
+// ER routes
+import accountPayableRoutes from "./routes/er/accountPayable.routes";
+import accountReceivableRoutes from "./routes/er/accountReceivable.routes";
+import assetRoutes from "./routes/er/asset.routes";
+import budgetRoutes from "./routes/er/budget.routes";
+import dashboardRoutes from "./routes/er/dashboard.routes";
+import documentRoutes from "./routes/er/document.routes";
+import kpiAssignmentRoutes from "./routes/er/kpiAssignment.routes";
+import ledgerEntryRoutes from "./routes/er/ledgerEntry.routes";
+import payrollRoutes from "./routes/er/payroll.routes";
+import performanceReviewRoutes from "./routes/er/performanceReview.routes";
+import taskRoutes from "./routes/er/task.routes";
+
+// Other missing routes
+import sheinCartRoutes from "./routes/delivery_marketplace_v1/sheinCart";
+import driverAttendanceRoutes from "./routes/driver_app/attendance";
+import kpisRoutes from "./routes/kpis";
+import marketingRoasRoutes from "./routes/marketing-roas";
+import messagesRoutes from "./routes/messages";
+import partnersRoutes from "./routes/partners";
+import roasRoutes from "./routes/roas";
+import segmentsRoutes from "./routes/segments";
+import supportCustomersRoutes from "./routes/support/customers";
+import supportMessagingPrefsRoutes from "./routes/support/messaging-prefs";
+import supportRoutes2 from "./routes/support";
+import userAvatarRoutes from "./routes/userAvatarRoutes";
+import couponRoutes from "./routes/Wallet_V8/coupon.routes";
+import subscriptionRoutes from "./routes/Wallet_V8/subscription.routes";
   
 dotenv.config();
 console.log("[BOOT] pid:", process.pid, "build:", new Date().toISOString());
@@ -129,12 +168,13 @@ app.use(`${API_PREFIX}/auth/password`, passwordResetRouter);
 app.use(`${API_PREFIX}/delivery/promotions`, deliveryPromotionRoutes);
 app.use(`${API_PREFIX}/delivery/categories`, deliveryCategoryRoutes);
 app.use(`${API_PREFIX}/delivery/order`, deliveryOrderRoutes);
+
 app.use(`${API_PREFIX}/auth`, marketingAuthRoutes);
 app.use(`${API_PREFIX}/reports/marketers`, marketerReports);
 app.use(`${API_PREFIX}/field/onboarding`, onboardingRoutes);
 app.use(`${API_PREFIX}/files`, mediaMarketerRoutes);
 app.use(`${API_PREFIX}/field`, quickOnboardRoutes);
-
+app.use(`${API_PREFIX}/admin/dashboard`, dashboardOverviewRoutes);
 app.use(`${API_PREFIX}/driver`, driverRoutes);
 
 
@@ -154,12 +194,12 @@ app.use(`${API_PREFIX}/delivery/subcategories`, deliverySubCategoryRoutes);
 app.use(`${API_PREFIX}/delivery/banners`, deliveryBannerRoutes);
 app.use(`${API_PREFIX}/delivery/sections`, storeSectionRoutes);
 app.use(`${API_PREFIX}/favorites`, favoritesRoutes);
-app.use(`${API_PREFIX}/`, adminCmsRoutes);
+app.use(`${API_PREFIX}/admin/onboarding-slides`, adminCmsRoutes);
 app.use(`${API_PREFIX}/wallet`, walletRoutes);
 app.use(`${API_PREFIX}/wallet/order`, walletOrderRoutes);
 
 
-app.use(`${API_PREFIX}`, pushRouter);
+app.use(`${API_PREFIX}/`, pushRouter);
 
 app.use(`${API_PREFIX}/topup`, topupRoutes);
 app.use(`${API_PREFIX}/support`, supportRoutes);
@@ -169,7 +209,9 @@ app.use(`${API_PREFIX}/admin`, adminRoutes);
 app.use(`${API_PREFIX}/admin/marketers`, adminMarketers);
 
 app.use(`${API_PREFIX}/admin/drivers`, adminDriverRoutes);
-app.use(`${API_PREFIX}/`, adminVendorModeration);
+app.use(`${API_PREFIX}/admin/vendors`, adminVendorModeration);
+
+
 
 
 // Routes (كما في كودك)
@@ -185,23 +227,60 @@ app.use(`${API_PREFIX}/accounts`, chartAccountRoutes);
 app.use(`${API_PREFIX}/journals`, journalBookRouter);
 app.use(`${API_PREFIX}/admin/withdrawals`, adminWithdrawalRoutes);
 app.use(`${API_PREFIX}/admin/storestats`, storeStatsRoutes);
-app.use(`${API_PREFIX}/admin/notifications`, adminNotificationRoutes);
 
 
-app.use(`${API_PREFIX}/`, adminNotificationTestRoutes);
-app.use(`${API_PREFIX}/`, marketerStoreVendorRoutes);
-app.use(`${API_PREFIX}/`, marketerOverviewRoutes);
-app.use(`${API_PREFIX}/`, adminOnboarding);
-app.use(`${API_PREFIX}/`, adminCommission);
-app.use(`${API_PREFIX}`, StatestoreRoutes);
+app.use(`${API_PREFIX}/marketer`, marketerStoreVendorRoutes);
+app.use(`${API_PREFIX}/marketer/overview`, marketerOverviewRoutes);
+app.use(`${API_PREFIX}/admin/field/onboarding`, adminOnboarding);
+app.use(`${API_PREFIX}/admin/commission-plans`, adminCommission);
+app.use(`${API_PREFIX}/delivery/stores`, StatestoreRoutes);
 
-app.use(`${API_PREFIX}/`, adminStoreModeration);
-app.use(`${API_PREFIX}/`, activationRoutes);
+app.use(`${API_PREFIX}/admin/marketer-stores`, adminStoreModeration);
+app.use(`${API_PREFIX}/admin/activation`, activationRoutes);
 app.use(`${API_PREFIX}/deliveryapp/withdrawals`, driverWithdrawalRoutes);
-app.use(`${API_PREFIX}/utility`, utilityRoutes);
-app.use(`${API_PREFIX}/`, rediasRoutes);
+app.use(`${API_PREFIX}/admin/debug/redis`, rediasRoutes);
 app.use(`${API_PREFIX}/pricing-strategies`, pricingStrategyRoutes);
-app.use(`${API_PREFIX}/`, marketingRouter);
+app.use(`${API_PREFIX}/marketing`, marketingRouter);
+
+// Missing route registrations
+// Admin routes
+app.use(`${API_PREFIX}/admin/wallet`, adminWalletCouponsRoutes);
+app.use(`${API_PREFIX}/admin/users`, adminUsersRoutes);
+app.use(`${API_PREFIX}/admin/drivers/assets`, driversAssetsRoutes);
+app.use(`${API_PREFIX}/admin/drivers/attendance`, driversAttendanceRoutes);
+app.use(`${API_PREFIX}/admin/drivers/docs`, driversDocsRoutes);
+app.use(`${API_PREFIX}/admin/drivers/finance`, driversFinanceRoutes);
+app.use(`${API_PREFIX}/admin/drivers/shifts`, driversShiftsRoutes);
+app.use(`${API_PREFIX}/admin/notifications/v2`, adminNotificationRoutes2);
+
+// ER routes
+app.use(`${API_PREFIX}/er/accounts-payable`, accountPayableRoutes);
+app.use(`${API_PREFIX}/er/accounts-receivable`, accountReceivableRoutes);
+app.use(`${API_PREFIX}/er/assets`, assetRoutes);
+app.use(`${API_PREFIX}/er/budgets`, budgetRoutes);
+app.use(`${API_PREFIX}/er/dashboard`, dashboardRoutes);
+app.use(`${API_PREFIX}/er/documents`, documentRoutes);
+app.use(`${API_PREFIX}/er/kpi-assignments`, kpiAssignmentRoutes);
+app.use(`${API_PREFIX}/er/ledger-entries`, ledgerEntryRoutes);
+app.use(`${API_PREFIX}/er/payroll`, payrollRoutes);
+app.use(`${API_PREFIX}/er/performance-reviews`, performanceReviewRoutes);
+app.use(`${API_PREFIX}/er/tasks`, taskRoutes);
+
+// Other routes
+app.use(`${API_PREFIX}/delivery/shein-cart`, sheinCartRoutes);
+app.use(`${API_PREFIX}/driver/attendance`, driverAttendanceRoutes);
+app.use(`${API_PREFIX}/kpis`, kpisRoutes);
+app.use(`${API_PREFIX}/marketing/roas`, marketingRoasRoutes);
+app.use(`${API_PREFIX}/messages`, messagesRoutes);
+app.use(`${API_PREFIX}/partners`, partnersRoutes);
+app.use(`${API_PREFIX}/roas`, roasRoutes);
+app.use(`${API_PREFIX}/segments`, segmentsRoutes);
+app.use(`${API_PREFIX}/support/customers`, supportCustomersRoutes);
+app.use(`${API_PREFIX}/support/messaging-prefs`, supportMessagingPrefsRoutes);
+app.use(`${API_PREFIX}/support/v2`, supportRoutes2);
+app.use(`${API_PREFIX}/users/avatar`, userAvatarRoutes);
+app.use(`${API_PREFIX}/wallet/coupons`, couponRoutes);
+app.use(`${API_PREFIX}/wallet/subscriptions`, subscriptionRoutes);
 
 app.get("/", (_, res) => {
   res.send("bThwani backend is running ✅");

@@ -1,4 +1,4 @@
-// server/src/routes/asset.routes.ts
+// server/src/routes/er/asset.routes.ts
 import { Router } from "express";
 import {
   getAllAssets,
@@ -6,12 +6,19 @@ import {
   createAsset,
   updateAsset,
   deleteAsset,
+  getAssetStats,
 } from "../../controllers/er/asset.controller";
 
 const router = Router();
+
 router.get("/", getAllAssets);
-router.get("/:id", getAssetById);
-router.post("/", createAsset);
-router.patch("/:id", updateAsset);
-router.delete("/:id", deleteAsset);
+
+// ضع المسارات الثابتة قبل /:id
+router.get("/stats", getAssetStats);
+
+// قيّد الـ id ليكون ObjectId صحيح
+router.get("/:id([0-9a-fA-F]{24})", getAssetById);
+router.patch("/:id([0-9a-fA-F]{24})", updateAsset);
+router.delete("/:id([0-9a-fA-F]{24})", deleteAsset);
+
 export default router;

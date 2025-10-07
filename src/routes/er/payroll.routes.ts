@@ -1,16 +1,26 @@
-import { Router } from 'express';
+// server/src/routes/er/payroll.routes.ts
+import { Router } from "express";
 import {
   getAllPayrolls,
   getPayrollById,
   createPayroll,
   updatePayroll,
   deletePayroll,
-} from '../../controllers/er/payroll.controller';
+  getPayrollStats,
+  processPayroll,
+} from "../../controllers/er/payroll.controller";
 
 const router = Router();
-router.get('/', getAllPayrolls);
-router.get('/:id', getPayrollById);
-router.post('/', createPayroll);
-router.patch('/:id', updatePayroll);
-router.delete('/:id', deletePayroll);
+
+router.get("/", getAllPayrolls);
+
+// ضع المسارات الثابتة قبل /:id
+router.get("/stats", getPayrollStats);
+router.post("/process", processPayroll);
+
+// قيِّد الـ id ليكون ObjectId صحيح
+router.get("/:id([0-9a-fA-F]{24})", getPayrollById);
+router.patch("/:id([0-9a-fA-F]{24})", updatePayroll);
+router.delete("/:id([0-9a-fA-F]{24})", deletePayroll);
+
 export default router;

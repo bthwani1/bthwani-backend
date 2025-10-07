@@ -6,7 +6,7 @@ const r = express.Router();
 const ORDERS = (req:any) => req.app.get("db").collection("orders");
 const USERS  = (req:any) => req.app.get("db").collection("users");
 
-r.get("/api/v1/marketing/kpis",
+r.get("/",
   validate({ query: z.object({
     from: z.string().optional(),
     to: z.string().optional()

@@ -15,7 +15,7 @@ export enum ModuleName {
   Products='products',
   Notification='notification',
   Quailty='quailty',
-  
+
   // أضف أي قسم جديد هنا
 }
 
@@ -43,6 +43,8 @@ export interface AdminUserDocument extends Document {
   roles: AdminRole[];
   // هنا نحدد أن المفتاح يجب أن يكون من ModuleName
   permissions: Partial<Record<ModuleName, ModulePermissions>>;
+  isActive: boolean;
+  lastLogin?: Date;
   comparePassword(candidate: string): Promise<boolean>;
 }
 
@@ -80,6 +82,8 @@ const AdminUserSchema = new Schema<AdminUserDocument>(
         message: "Invalid module name in permissions",
       },
     },
+    isActive: { type: Boolean, default: true },
+    lastLogin: { type: Date },
   },
   { timestamps: true }
 );

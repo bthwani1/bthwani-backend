@@ -5,7 +5,7 @@ import { validate } from "../middleware/validate";
 
 const r = express.Router();
 
-r.get("/api/v1/marketing/roas",
+r.get("/roas",
   validate({ query: z.object({
     from: z.string().optional(), // YYYY-MM-DD
     to:   z.string().optional(),

@@ -5,7 +5,7 @@ import RoasDaily from '../models/RoasDaily';
 const r = express.Router();
 
 // GET /api/v1/marketing/roas?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=source|campaign|none
-r.get('/marketing/roas', async (req, res, next) => {
+r.get('/roas', async (req, res, next) => {
   try {
     const from = req.query.from ? new Date(String(req.query.from)) : new Date(Date.now()-30*864e5);
     const to   = req.query.to   ? new Date(String(req.query.to))   : new Date();

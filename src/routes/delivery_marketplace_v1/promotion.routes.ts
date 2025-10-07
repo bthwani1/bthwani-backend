@@ -8,6 +8,7 @@ import {
   deletePromotion,
   getPromotionsByStores,
   getPromotionsByProducts,
+  getAllPromotionsAdmin,
 } from "../../controllers/delivery_marketplace_v1/promotion.controller";
 import { verifyAdmin } from "../../middleware/verifyAdmin";
 import { verifyFirebase } from "../../middleware/verifyFirebase";
@@ -19,6 +20,7 @@ router.get("/", getActivePromotions); // ✅ بدل الهاندلر اليدو�
 router.get("/by-stores", getPromotionsByStores);
 router.get("/by-products", getPromotionsByProducts);
 router.get("/:id", getPromotionById);
+router.get("/admin", verifyFirebase, verifyAdmin, getAllPromotionsAdmin);
 
 router.post("/", verifyFirebase, verifyAdmin, createPromotion);
 router.put("/:id", verifyFirebase, verifyAdmin, updatePromotion);

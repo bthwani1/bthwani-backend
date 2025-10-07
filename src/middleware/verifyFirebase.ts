@@ -1,11 +1,12 @@
 // src/middleware/verifyFirebase.ts  (debug, اطبع كل شيء مهم)
 import { adminAuth } from "../config/firebaseAdmin";
 console.log("[verifyFirebase] LOADED build:", new Date().toISOString());
+import { Request, Response, NextFunction } from "express";
 
 // src/middleware/verifyFirebase.ts
 const CHECK_REVOKED = (process.env.FB_CHECK_REVOKED || "true") === "true";
 
-export const verifyFirebase = async (req, res, next) => {
+export const verifyFirebase = async (req: Request, res: Response, next: NextFunction) => {
   try {
     let token = (req.headers.authorization || "")
       .replace(/^Bearer\s+/i, "")
