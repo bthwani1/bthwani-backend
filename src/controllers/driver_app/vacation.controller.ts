@@ -69,7 +69,22 @@ export const getDriverReports = async (req: Request, res: Response) => {
 // GET /driver/vacations
 export const listMyVacations = async (req: Request, res: Response) => {
   const driverId = req.user!.id;
-  const vacs = await VacationRequest.find({ driverId }).sort({ createdAt: -1 });
+  const { from, to, status } = req.query;
+
+  // بناء فلتر البحث
+  const filter: any = { driverId };
+
+  if (status && ['pending', 'approved', 'rejected'].includes(status as string)) {
+    filter.status = status;
+  }
+
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = new Date(from as string);
+    if (to) filter.createdAt.$lte = new Date(to as string);
+  }
+
+  const vacs = await VacationRequest.find(filter).sort({ createdAt: -1 });
   res.json(vacs);
 };
 export const getActiveDriversCount = async (_req: Request, res: Response) => {
@@ -88,6 +103,16 @@ export const approveVacation = async (req: Request, res: Response) => {
   const vac = await VacationRequest.findByIdAndUpdate(
     req.params.id,
     { status: "approved" },
+    { new: true }
+  );
+  res.json(vac);
+};
+
+// PATCH /admin/vacations/:id/reject
+export const rejectVacation = async (req: Request, res: Response) => {
+  const vac = await VacationRequest.findByIdAndUpdate(
+    req.params.id,
+    { status: "rejected" },
     { new: true }
   );
   res.json(vac);

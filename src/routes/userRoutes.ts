@@ -38,6 +38,7 @@ import { sendEmailOTP, verifyOTP } from "../controllers/otpControllers";
 import { User } from "../models/user";
 import { OTP } from "../models/otp";
 import { Types } from "mongoose";
+import { sendOTPByChannel } from "../utils/otpAll";
 
 const router = Router();
 
@@ -121,20 +122,28 @@ router.post("/otp/send", verifyFirebase, async (req, res) => {
       return;
     }
 
-    const purpose = "verifyEmail"; // ثبّت القيمة
+    const { channel = "email", purpose = "verifyEmail" } = req.body;
+    const validChannels = ["email", "whatsapp", "sms"];
+    if (!validChannels.includes(channel)) {
+      res.status(400).json({ ok:false, message:"قناة غير مدعومة" });
+      return;
+    }
+
+    // للـ WhatsApp/SMS نحتاج رقم الهاتف
+    if ((channel === "whatsapp" || channel === "sms") && !user.phone) {
+      res.status(400).json({ ok:false, message:"رقم الهاتف مطلوب لإرسال عبر الواتساب/الرسائل" });
+      return;
+    }
+
     const code = await sendEmailOTP(email, String(user._id), purpose);
 
     // في التطوير: أعِد الكود لمساعدة الاختبار
     const isDev = process.env.NODE_ENV !== "production";
-    // أرسل الرد فورًا
     res.json({ ok: true, ...(isDev && { devCode: code }) });
-    
-    // وابعث الإيميل بدون حبس الرد (لو حاب تنتظر بحد أقصى):
-    // void (async () => {
-    //   try {
-    //     await Promise.race([sendOtpEmail(email, code), new Promise((_,rej)=>setTimeout(()=>rej(new Error('smtp-timeout')), 5000))]);
-    //   } catch (e) { console.error("SMTP later error:", e?.code || e); }
-    // })();
+
+    // إرسال حسب القناة
+    const recipient = channel === "email" ? email : user.phone;
+    await sendOTPByChannel(channel as "email" | "whatsapp" | "sms", recipient!, code, purpose);
 
   } catch (err: any) {
     console.error("❌ /users/otp/send failed:", err);

@@ -5,6 +5,7 @@ import {
   marketerLogin,
   me,
   requestAccountDeletion,
+  storePushToken,
 } from "../../controllers/marketer_v1/auth.controller";
 import { verifyMarketerJWT } from "../../middleware/verifyMarketerJWT";
 
@@ -31,5 +32,11 @@ router.post("/delete-account/request", verifyMarketerJWT, requestAccountDeletion
  */
 router.delete("/delete-account", verifyMarketerJWT, deleteMyAccountSoft);
 
+/**
+ * Store push token for notifications
+ * POST /auth/push-token
+ * body: { token: string }
+ */
+router.post("/push-token", verifyMarketerJWT, storePushToken);
 
 export default router;

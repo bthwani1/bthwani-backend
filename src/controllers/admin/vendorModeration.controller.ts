@@ -2,25 +2,39 @@ import { Request, Response } from "express";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import Vendor from "../../models/vendor_app/Vendor";
+import { parseListQuery } from "../../utils/query";
 
 export async function list(req: Request, res: Response) {
-  const { q, active, storeId } = req.query as any;
+  const { q, page, perPage, filters, sort } = parseListQuery(req.query);
+
   const filter: any = {};
-  if (typeof active !== "undefined") filter.isActive = active === "true";
-  if (storeId && mongoose.Types.ObjectId.isValid(storeId))
-    filter.store = new mongoose.Types.ObjectId(storeId);
-  if (q)
-    filter.$or = [
-      { fullName: new RegExp(q, "i") },
-      { phone: new RegExp(q, "i") },
-      { email: new RegExp(q, "i") },
-    ];
-  const data = await Vendor.find(filter)
+  if (typeof req.query.active !== "undefined") filter.isActive = req.query.active === "true";
+  if (filters?.storeId && mongoose.Types.ObjectId.isValid(filters.storeId))
+    filter.store = new mongoose.Types.ObjectId(filters.storeId);
+  if (q) filter.$or = [{ fullName: new RegExp(q, "i") }, { phone: new RegExp(q, "i") }, { email: new RegExp(q, "i") }];
+
+  const total = await Vendor.countDocuments(filter);
+  const vendors = await Vendor.find(filter)
     .populate("store", "name address")
     .select("-password")
-    .sort({ createdAt: -1 })
+    .sort(sort ?? { createdAt: -1 })
+    .skip((page - 1) * perPage)
+    .limit(perPage)
     .lean();
-  res.json(data);
+
+  // نحافظ على شكل الواجهة الحالية + نقدّم meta قياسي اختياريًا
+  res.json({
+    vendors,
+    pagination: {
+      page,
+      limit: perPage,
+      total,
+      pages: Math.ceil(total / perPage),
+    },
+    // شكل موحّد (اختياري للاستهلاك الجديد):
+    items: vendors,
+    meta: { page, per_page: perPage, total, returned: vendors.length },
+  });
 }
 
 export async function getOne(req: Request, res: Response) {

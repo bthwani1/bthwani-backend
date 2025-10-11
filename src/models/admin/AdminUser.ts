@@ -24,6 +24,7 @@ export enum AdminRole {
   SUPERADMIN = "superadmin",
   ADMIN = "admin",
   MANAGER = "manager",
+  OPERATOR = "operator",
   VENDOR="vendor",
 }
 

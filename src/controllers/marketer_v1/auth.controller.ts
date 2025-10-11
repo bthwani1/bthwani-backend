@@ -196,3 +196,30 @@ export async function deleteMyAccountSoft(req: Request, res: Response) {
     session.endSession();
   }
 }
+
+// POST /api/v1/marketer/push-token - Store push token for marketer
+export async function storePushToken(req: Request, res: Response) {
+  try {
+    const marketerId = (req as any).user?.id;
+    const { token } = req.body;
+
+    if (!marketerId) {
+       res.status(401).json({ message: "Unauthorized" });
+       return;
+    }
+
+    if (!token) {
+       res.status(400).json({ message: "Token is required" });
+       return;
+    }
+
+    await Marketer.findByIdAndUpdate(marketerId, { expoPushToken: token });
+
+    res.json({ success: true, message: "Push token stored successfully" });
+
+  } catch (err: any) {
+    console.error("storePushToken error:", err);
+    res.status(500).json({ message: err.message || "Server error" });
+    return;
+  }
+}

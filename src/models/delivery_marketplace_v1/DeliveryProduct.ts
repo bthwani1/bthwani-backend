@@ -67,6 +67,9 @@ productSchema.index({ store: 1, isAvailable: 1 });
 productSchema.index({ store: 1, section: 1 });
 productSchema.index({ subCategory: 1 });
 
+// فهرس نصي مركب للبحث الدقيق والأداء
+productSchema.index({ name: "text", description: "text", tags: "text" }, { name: "product_text_index" });
+
 export default mongoose.model<IDeliveryProduct>(
   "DeliveryProduct",
   productSchema

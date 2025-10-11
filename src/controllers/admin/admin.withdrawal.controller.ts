@@ -1,13 +1,25 @@
 import { Request, Response } from "express";
 import  Driver  from "../../models/Driver_app/driver";
 import { WithdrawalRequest } from "../../models/Wallet_V8/WithdrawalRequest";
+import { parseListQuery } from "../../utils/query";
 
 export const listWithdrawals = async (req: Request, res: Response) => {
-  const requests = await WithdrawalRequest.find().populate(
-    "userId",
-    "fullName phone role"
-  );
-  res.json(requests);
+  const { page, perPage, sort } = parseListQuery(req.query);
+
+  const total = await WithdrawalRequest.countDocuments({});
+  const requests = await WithdrawalRequest.find({})
+    .populate("userId", "fullName phone role")
+    .sort(sort ?? { createdAt: -1 })
+    .skip((page - 1) * perPage)
+    .limit(perPage)
+    .lean();
+
+  res.json({
+    withdrawalRequests: requests,
+    pagination: { page, limit: perPage, total, pages: Math.ceil(total / perPage) },
+    items: requests,
+    meta: { page, per_page: perPage, total, returned: requests.length },
+  });
 };
 
 export const approveWithdrawal = async (req: Request, res: Response) => {

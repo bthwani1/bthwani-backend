@@ -9,6 +9,7 @@ import { generateOTP } from "../../utils/otp";
 import { sendWhatsAppMessage } from "../../utils/whatsapp";
 import Order from "../../models/delivery_marketplace_v1/Order";
 import driverReviewModel from "../../models/Driver_app/driverReview.model";
+import DriverDocument from "../../models/Driver_app/DriverDocument";
 import mongoose, { Types } from "mongoose";
 import dispatchOffer from "../../models/dispatchOffer";
 
@@ -133,7 +134,35 @@ export const getMyProfile = async (req: Request, res: Response) => {
     res.status(404).json({ message: "Driver not found" });
     return;
   }
-  res.json(driver);
+
+  // حساب مؤشر الإكمال
+  const docsApproved = await DriverDocument.countDocuments({
+    driver: driver._id,
+    status: "approved"
+  });
+
+  const required = [
+    "fullName",
+    "vehicleType",
+    "residenceLocation.lat",
+    "residenceLocation.lng"
+  ];
+
+  const missing = required.filter(f => {
+    const parts = f.split(".");
+    let cur: any = driver;
+    for (const p of parts) cur = cur?.[p];
+    return cur === undefined || cur === null || cur === "";
+  });
+
+  const profileComplete = missing.length === 0 && docsApproved >= 2;
+
+  res.json({
+    ...driver.toObject(),
+    profileComplete,
+    missingRequired: missing,
+    docsApproved
+  });
 };
 
 export const updateMyProfile = async (req: Request, res: Response) => {
@@ -141,6 +170,8 @@ export const updateMyProfile = async (req: Request, res: Response) => {
     "fullName",
     "email",
     "vehicleType",
+    "vehicleClass",
+    "vehiclePower",
     "residenceLocation",
   ];
   const updates: any = {};

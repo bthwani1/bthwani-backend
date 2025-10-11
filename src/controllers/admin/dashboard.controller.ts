@@ -6,7 +6,6 @@ import Driver from "../../models/Driver_app/driver";
 import DeliveryStore from "../../models/delivery_marketplace_v1/DeliveryStore";
 import driverReviewModel from "../../models/Driver_app/driverReview.model";
 import SupportTicket from "../../models/support/SupportTicket";
-import { Types } from "mongoose";
 
 /** مساعد: تحويل from/to + tz إلى نطاق زمني مضبوط */
 function getRange(req: Request) {
@@ -249,11 +248,12 @@ export async function getAdminAlerts(req: Request, res: Response) {
 }
 
 /** GET /admin/dashboard/ratings - جلب جميع التقييمات */
+import { parseListQuery } from "../../utils/query";
+
 export async function getAllRatings(req: Request, res: Response) {
   try {
-    const page = parseInt((req.query.page as string) || "1", 10);
-    const limit = Math.min(parseInt((req.query.limit as string) || "20", 10), 100);
-    const skip = (page - 1) * limit;
+    const { page, perPage } = parseListQuery(req.query);
+    const skip = (page - 1) * perPage;
 
     const type = (req.query.type as string) || "order"; // "order" أو "driver"
     const sortBy = (req.query.sortBy as string) || "createdAt";
@@ -305,7 +305,7 @@ export async function getAllRatings(req: Request, res: Response) {
           $facet: {
             data: [
               { $skip: skip },
-              { $limit: limit }
+              { $limit: perPage }
             ],
             total: [
               { $count: "count" }
@@ -363,7 +363,7 @@ export async function getAllRatings(req: Request, res: Response) {
           $facet: {
             data: [
               { $skip: skip },
-              { $limit: limit }
+              { $limit: perPage }
             ],
             total: [
               { $count: "count" }
@@ -415,9 +415,9 @@ export async function getAllRatings(req: Request, res: Response) {
       ratings,
       pagination: {
         page,
-        limit,
+        limit: perPage,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / perPage)
       },
       stats: {
         averageCompanyRating: generalStats.avgCompanyRating,
@@ -441,9 +441,8 @@ export async function getAllRatings(req: Request, res: Response) {
 /** GET /admin/dashboard/support-tickets - جلب جميع نقاط الدعم */
 export async function getAllSupportTickets(req: Request, res: Response) {
   try {
-    const page = parseInt((req.query.page as string) || "1", 10);
-    const limit = Math.min(parseInt((req.query.limit as string) || "20", 10), 100);
-    const skip = (page - 1) * limit;
+    const { page, perPage } = parseListQuery(req.query);
+    const skip = (page - 1) * perPage;
 
     const status = req.query.status as string;
     const priority = req.query.priority as string;
@@ -554,7 +553,7 @@ export async function getAllSupportTickets(req: Request, res: Response) {
         $facet: {
           data: [
             { $skip: skip },
-            { $limit: limit }
+            { $limit: perPage }
           ],
           total: [
             { $count: "count" }
@@ -606,9 +605,9 @@ export async function getAllSupportTickets(req: Request, res: Response) {
       tickets: ticketsData,
       pagination: {
         page,
-        limit,
+        limit: perPage,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / perPage)
       },
       stats: {
         totalTickets: generalStats.totalTickets,
@@ -696,7 +695,7 @@ export async function addSupportTicketNote(req: Request, res: Response) {
     // إضافة الملاحظة إلى التذكرة (يمكن توسيع هذا لاحقًا لحفظ الملاحظات بشكل منفصل)
     const noteData = {
       text: note.trim(),
-      addedBy: req.user?.email || "admin",
+      addedBy: (req as any).userData?.email || "admin",
       internal: internal || false,
       createdAt: new Date()
     };

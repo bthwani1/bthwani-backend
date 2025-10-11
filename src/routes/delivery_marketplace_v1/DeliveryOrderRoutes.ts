@@ -133,6 +133,160 @@ router.post("/:id/repeat", controller.repeatOrder);
 
 router.get("/:id", controller.getOrderById);
 
+/**
+ * @swagger
+ * /api/v1/delivery/order:
+ *   get:
+ *     summary: جلب قائمة الطلبات مع فلترة شاملة وتصفح
+ *     description: يعيد قائمة جميع الطلبات مع دعم البحث والفلترة المتقدمة والتصفح
+ *     tags: [Delivery, Orders]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         description: نص البحث في تفاصيل الطلب
+ *         example: ""
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: رقم الصفحة
+ *         example: 1
+ *       - in: query
+ *         name: per_page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *         description: عدد العناصر في الصفحة
+ *         example: 20
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *         description: ترتيب البيانات (مثال: createdAt:desc)
+ *         example: createdAt:desc
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending_confirmation, under_review, preparing, assigned, out_for_delivery, delivered, returned, awaiting_procurement, procured, procurement_failed, cancelled]
+ *         description: فلترة حسب حالة الطلب
+ *         example: delivered
+ *       - in: query
+ *         name: city
+ *         schema:
+ *           type: string
+ *         description: فلترة حسب المدينة
+ *         example: الرياض
+ *       - in: query
+ *         name: storeId
+ *         schema:
+ *           type: string
+ *         description: فلترة حسب المتجر
+ *         example: 60f1b2b3c4d5e6f7g8h9i0j1
+ *       - in: query
+ *         name: driverId
+ *         schema:
+ *           type: string
+ *         description: فلترة حسب السائق
+ *         example: 60f1b2b3c4d5e6f7g8h9i0j2
+ *       - in: query
+ *         name: paymentMethod
+ *         schema:
+ *           type: string
+ *           enum: [cash, card, wallet, cod, mixed]
+ *         description: فلترة حسب طريقة الدفع
+ *         example: cash
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: تاريخ البداية للفلترة
+ *         example: 2024-01-01
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: تاريخ النهاية للفلترة
+ *         example: 2024-01-31
+ *     responses:
+ *       200:
+ *         description: قائمة الطلبات بنجاح
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/PaginatedResponse'
+ *                 - type: object
+ *                   properties:
+ *                     orders:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           _id:
+ *                             type: string
+ *                             example: 60f1b2b3c4d5e6f7g8h9i0j1
+ *                           user:
+ *                             type: object
+ *                             properties:
+ *                               _id:
+ *                                 type: string
+ *                                 example: 60f1b2b3c4d5e6f7g8h9i0j2
+ *                               fullName:
+ *                                 type: string
+ *                                 example: محمد أحمد
+ *                               phone:
+ *                                 type: string
+ *                                 example: "+966501234567"
+ *                           driver:
+ *                             type: object
+ *                             properties:
+ *                               _id:
+ *                                 type: string
+ *                                 example: 60f1b2b3c4d5e6f7g8h9i0j3
+ *                               fullName:
+ *                                 type: string
+ *                                 example: أحمد محمد
+ *                               phone:
+ *                                 type: string
+ *                                 example: "+966501234568"
+ *                           status:
+ *                             type: string
+ *                             enum: [pending_confirmation, under_review, preparing, assigned, out_for_delivery, delivered, returned, awaiting_procurement, procured, procurement_failed, cancelled]
+ *                             example: delivered
+ *                           totalAmount:
+ *                             type: number
+ *                             example: 125.50
+ *                           paymentMethod:
+ *                             type: string
+ *                             enum: [cash, card, wallet, cod, mixed]
+ *                             example: cash
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *                             example: 2024-01-15T10:30:00.000Z
+ *                           address:
+ *                             type: object
+ *                             properties:
+ *                               city:
+ *                                 type: string
+ *                                 example: الرياض
+ *                               street:
+ *                                 type: string
+ *                                 example: شارع الملك فهد
+ *       401:
+ *         $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         $ref: '#/components/schemas/ErrorResponse'
+ */
 router.get("/", verifyFirebase, verifyAdmin, controller.getAllOrders);
 
 // تعيين/تغيير سائق (طلب كامل)

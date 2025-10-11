@@ -1,6 +1,7 @@
 // middleware/verifyAdmin.ts
 import { Request, Response, NextFunction } from "express";
 import { User } from "../models/user";
+import { ERR } from "../utils/errors";
 
 export const verifyAdmin = async (
   req: Request,
@@ -33,7 +34,7 @@ export const verifyAdmin = async (
     );
 
     if (!firebaseUID) {
-      res.status(401).json({ message: "Unauthorized" });
+      res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Unauthorized" } });
       return;
     }
 
@@ -46,7 +47,7 @@ export const verifyAdmin = async (
     }).lean();
 
     if (!user || !["admin", "superadmin"].includes(user.role)) {
-      res.status(403).json({ message: "Admin access required" });
+      res.status(403).json({ error: { code: "ADMIN_REQUIRED", message: "Admin access required" } });
       return;
     }
 
@@ -54,6 +55,7 @@ export const verifyAdmin = async (
     next();
   } catch (err) {
     console.error("verifyAdmin error:", err);
-    res.status(500).json({ message: "Error verifying admin" });
+    res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Error verifying admin" } });
+    return;
   }
 };

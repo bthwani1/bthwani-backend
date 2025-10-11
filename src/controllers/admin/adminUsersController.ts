@@ -4,7 +4,7 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { AdminUser, AdminRole, ModuleName, ModulePermissions } from '../../models/admin/AdminUser';
-import { body, param } from 'express-validator';
+import { recordFailedAttempt, resetFailedAttempts } from '../../middleware/bruteForceProtection';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 const TOKEN_EXPIRY = '1d'; // مدة صلاحية التوكن
@@ -50,26 +50,62 @@ res.status(400).json({ message: 'Username taken' });
 export const loginAdmin = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
+
+    // البحث عن المستخدم
     const admin = await AdminUser.findOne({ username });
     if (!admin) {
-res.status(401).json({ message: 'Invalid credentials' });
-        return;
-    } 
+      // تسجيل محاولة فاشلة
+      await recordFailedAttempt(req);
+       res.status(401).json({
+        message: 'بيانات الدخول غير صحيحة',
+        error: 'INVALID_CREDENTIALS'
+      });
+      return;
+    }
 
+    // التحقق من كلمة المرور
     const isMatch = await admin.comparePassword(password);
     if (!isMatch) {
-res.status(401).json({ message: 'Invalid credentials' });
-        return;
-    } 
+      // تسجيل محاولة فاشلة
+      await recordFailedAttempt(req);
+       res.status(401).json({
+        message: 'بيانات الدخول غير صحيحة',
+        error: 'INVALID_CREDENTIALS'
+      });
+      return;
+    }
 
+    // التحقق من حالة الحساب
+    if (!admin.isActive) {
+       res.status(401).json({
+        message: 'الحساب معطل، يرجى التواصل مع مدير النظام',
+        error: 'ACCOUNT_DISABLED'
+      });
+      return;
+    }
+
+    // تسجيل دخول ناجح - إعادة تعيين محاولات الفشل
+    await resetFailedAttempts(req);
+
+    // إنشاء التوكن
     const token = jwt.sign(
       { id: admin._id, roles: admin.roles, permissions: admin.permissions },
       JWT_SECRET,
       { expiresIn: TOKEN_EXPIRY }
     );
-    res.json({ token });
+
+    res.json({
+      token,
+      user: {
+        id: admin._id,
+        username: admin.username,
+        roles: admin.roles,
+        permissions: admin.permissions
+      }
+    });
   } catch (err) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Login error:', err);
+    res.status(500).json({ message: 'خطأ في الخادم' });
   }
 };
 
@@ -107,7 +143,7 @@ export const updatePermissions = async (req: Request, res: Response) => {
 
     if (!updated) {
       res.status(404).json({ message: 'Admin not found' });
-      return;
+      return
     }
     res.json(updated);
   } catch (err) {
@@ -123,7 +159,7 @@ export const getAdminById = async (req: Request, res: Response) => {
 
     if (!admin) {
       res.status(404).json({ message: 'Admin not found' });
-      return;
+      return
     }
 
     res.json(admin);

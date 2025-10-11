@@ -6,6 +6,8 @@ import Vendor from "../../models/vendor_app/Vendor";
 import { ensureGLForStore } from "../../accounting/services/ensureEntityGL";
 import { Types } from "mongoose";
 import DeliveryCategory from "../../models/delivery_marketplace_v1/DeliveryCategory";
+import { getDistance } from "geolib";
+import { parseListQuery } from "../../utils/query";
 
 // Create a new delivery store
 export const create = async (req: Request, res: Response) => {
@@ -569,79 +571,55 @@ function buildPipeline({
   return pipeline;
 }
 
-export async function searchStores(req: Request, res: Response) {
-  const {
-    q = "",
-    categoryId,
-    filter = "all",
-    page = "1",
-    limit = "20",
-    lat,
-    lng,
-  } = req.query as any;
-
-  const pageNum = Math.max(parseInt(page) || 1, 1);
-  const lim = Math.min(Math.max(parseInt(limit) || 20, 1), 50);
-  const skip = (pageNum - 1) * lim;
-
-  const userIdStr =
-    (req as any).user?._id ||
-    (req as any).user?.mongoId ||
-    (req as any).user?.id ||
-    null;
-  const userObjId =
-    userIdStr && Types.ObjectId.isValid(String(userIdStr))
-      ? new Types.ObjectId(String(userIdStr))
-      : null;
-
-  const latNum = lat != null ? parseFloat(lat) : NaN;
-  const lngNum = lng != null ? parseFloat(lng) : NaN;
-
-  // المحاولة الأولى: text (إن كان فيه فهرس)
-  let items: any[] = [];
+export const searchStores = async (req: Request, res: Response) => {
   try {
-    const pipeText = buildPipeline({
-      q,
-      categoryId,
-      filter,
-      pageNum,
-      lim,
-      skip,
-      latNum,
-      lngNum,
-      userObjId,
-      useText: true,
-    });
-    items = await (DeliveryStore as any).aggregate(pipeText, {
-      allowDiskUse: true,
-    });
-  } catch (err: any) {
-    // أي خطأ → جرّب Regex
-    const pipeRx = buildPipeline({
-      q,
-      categoryId,
-      filter,
-      pageNum,
-      lim,
-      skip,
-      latNum,
-      lngNum,
-      userObjId,
-      useText: false,
-    });
-    try {
-      items = await (DeliveryStore as any).aggregate(pipeRx, {
-        allowDiskUse: true,
-      });
-    } catch (e2: any) {
-      console.error("searchStores final error:", e2?.message || e2);
-      res.status(500).json({ message: "Search failed" });
-      return;
-    }
-  }
+    const { q, page, perPage } = parseListQuery(req.query);
+    const categoryId = (req.query.categoryId as string) || undefined;
+    const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
+    const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+    const skip = (page - 1) * perPage;
 
-  res.json({ items, page: pageNum, hasMore: items.length === lim });
-}
+    const and: any[] = [
+      { $or: [{ isActive: { $ne: false } }, { isActive: { $exists: false } }] },
+    ];
+    if (q) and.push({ name: { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } });
+    if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
+      and.push({ category: new mongoose.Types.ObjectId(categoryId) });
+    }
+
+    const filter = and.length ? { $and: and } : {};
+    let items = await DeliveryStore.find(filter)
+      .select("_id name logo address location isActive category")
+      .skip(skip)
+      .limit(perPage)
+      .lean();
+
+    // ترتيب بالأقرب إن وُجد lat/lng صالحين
+    if (lat != null && lng != null) {
+      items = items
+        .map((s: any) => {
+          const storeLat = s?.location?.lat;
+          const storeLng = s?.location?.lng;
+          const dist = (storeLat != null && storeLng != null)
+            ? getDistance(
+                { latitude: lat, longitude: lng },
+                { latitude: storeLat, longitude: storeLng }
+              )
+            : Number.MAX_SAFE_INTEGER;
+          return { ...s, distance: dist };
+        })
+        .sort((a: any, b: any) => a.distance - b.distance);
+    }
+
+    const total = await DeliveryStore.countDocuments(filter);
+    const hasMore = page * perPage < total;
+
+    res.json({ items, hasMore });
+  } catch (err: any) {
+    console.error("searchStores error:", err);
+    res.status(500).json({ message: err?.message || "Server error" });
+  }
+};
 
 // Delete a delivery store
 export const remove = async (req: Request, res: Response) => {

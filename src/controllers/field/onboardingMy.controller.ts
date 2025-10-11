@@ -124,3 +124,170 @@ export const getOneFlexible = async (req: Request, res: Response) => {
     // لو كانت الهيدر مُرسلة بالفعل، لا ترسل مرة ثانية
   }
 };
+
+// POST /api/v1/field/onboarding - Create draft onboarding
+export const createOnboarding = async (req: Request, res: Response) => {
+  try {
+    const marketerId = (req.user as any)?.id;
+    if (!marketerId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const {
+      storeDraft,
+      ownerDraft,
+      attachments,
+      participants
+    } = req.body;
+
+    // تطبيع participants
+    const normalizedParticipants = Array.isArray(participants) && participants.length
+      ? participants.map((p: any) => ({
+          marketerId: p.uid || marketerId,
+          role: p.role || "lead",
+          weight: typeof p.weight === "number" ? p.weight : 1,
+        }))
+      : [{ marketerId, role: "lead", weight: 1 }];
+
+    const onboarding = new Onboarding({
+      storeDraft,
+      ownerDraft,
+      attachments: attachments || [],
+      participants: normalizedParticipants,
+      status: "draft",
+      createdByMarketerId: marketerId,
+    });
+
+    await onboarding.save();
+
+    res.status(201).json({
+      id: onboarding._id,
+      status: onboarding.status,
+      createdAt: onboarding.createdAt,
+    });
+  } catch (e: any) {
+    if (!res.headersSent) {
+      res.status(500).json({ message: e.message || "Server error" });
+    }
+  }
+};
+
+// PATCH /api/v1/field/onboarding/:id - Update onboarding
+export const updateOnboarding = async (req: Request, res: Response) => {
+  try {
+    const marketerId = (req.user as any)?.id;
+    const { id } = req.params;
+
+    if (!marketerId || !mongoose.isValidObjectId(id)) {
+      res.status(401).json({ message: "Unauthorized or invalid id" });
+      return;
+    }
+
+    const {
+      storeDraft,
+      ownerDraft,
+      attachments,
+      participants
+    } = req.body;
+
+    const onboarding = await Onboarding.findById(id);
+    if (!onboarding) {
+      res.status(404).json({ message: "Onboarding not found" });
+      return;
+    }
+
+    // تحقق من الملكية
+    if (onboarding.createdByMarketerId !== marketerId) {
+      res.status(403).json({ message: "Forbidden" });
+      return;
+    }
+
+    // تحقق من أنه لا يزال draft
+    if (onboarding.status !== "draft") {
+      res.status(400).json({ message: "Can only update draft onboarding" });
+      return;
+    }
+
+    // تطبيع participants إذا قدمت
+    if (participants) {
+      const normalizedParticipants = Array.isArray(participants) && participants.length
+        ? participants.map((p: any) => ({
+            marketerId: p.uid || marketerId,
+            role: p.role || "lead",
+            weight: typeof p.weight === "number" ? p.weight : 1,
+          }))
+        : [{ marketerId, role: "lead", weight: 1 }];
+
+      onboarding.participants = normalizedParticipants;
+    }
+
+    if (storeDraft) onboarding.storeDraft = storeDraft;
+    if (ownerDraft) onboarding.ownerDraft = ownerDraft;
+    if (attachments) onboarding.attachments = attachments;
+
+    await onboarding.save();
+
+    res.json({
+      id: onboarding._id,
+      status: onboarding.status,
+      updatedAt: onboarding.updatedAt,
+    });
+  } catch (e: any) {
+    if (!res.headersSent) {
+      res.status(500).json({ message: e.message || "Server error" });
+    }
+  }
+};
+
+// POST /api/v1/field/onboarding/:id/submit - Submit onboarding for review
+export const submitOnboarding = async (req: Request, res: Response) => {
+  try {
+    const marketerId = (req.user as any)?.id;
+    const { id } = req.params;
+
+    if (!marketerId || !mongoose.isValidObjectId(id)) {
+      res.status(401).json({ message: "Unauthorized or invalid id" });
+      return;
+    }
+
+    const onboarding = await Onboarding.findById(id);
+    if (!onboarding) {
+      res.status(404).json({ message: "Onboarding not found" });
+      return;
+    }
+
+    // تحقق من الملكية
+    if (onboarding.createdByMarketerId !== marketerId) {
+      res.status(403).json({ message: "Forbidden" });
+      return;
+    }
+
+    // تحقق من أنه لا يزال draft
+    if (onboarding.status !== "draft") {
+      res.status(400).json({ message: "Onboarding is not in draft status" });
+      return;
+    }
+
+    // تحقق من البيانات المطلوبة
+    if (!onboarding.storeDraft?.name || !onboarding.storeDraft?.address) {
+      res.status(400).json({ message: "Store name and address are required" });
+      return;
+    }
+
+    // تحديث الحالة
+    onboarding.status = "submitted";
+    onboarding.submittedAt = new Date();
+    await onboarding.save();
+
+    res.json({
+      id: onboarding._id,
+      status: onboarding.status,
+      submittedAt: onboarding.submittedAt,
+    });
+  } catch (e: any) {
+    if (!res.headersSent) {
+      res.status(500).json({ message: e.message || "Server error" });
+    }
+  }
+};

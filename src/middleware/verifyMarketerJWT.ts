@@ -15,11 +15,19 @@ export const verifyMarketerJWT = (
 ) => {
   try {
     const auth = (req.headers.authorization || "") as string;
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-    if (!token) {
-      res.status(401).json({ message: "Missing token" });
+
+    if (!auth.startsWith("Bearer ")) {
+      res.status(401).json({ message: "Invalid authorization format - expected Bearer token" });
       return;
     }
+
+    const token = auth.slice(7)?.trim();
+
+    if (!token || token.length < 10) {
+      res.status(401).json({ message: "Invalid token format - token too short" });
+      return;
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
     // normalized user object
     (req as any).user = {

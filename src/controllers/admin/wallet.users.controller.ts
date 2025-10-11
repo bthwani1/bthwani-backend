@@ -174,14 +174,15 @@ export async function patchWalletBalance(req: Request, res: Response) {
 }
 
 // GET /admin/wallet/transactions
+import { parseListQuery } from "../../utils/query";
+
 export async function listTransactions(req: Request, res: Response) {
+  const { page, perPage } = parseListQuery(req.query);
   const {
     userId,
     type,
     status,
     method,
-    page = 1,
-    pageSize = 50,
     from,
     to,
   } = req.query as any;
@@ -196,12 +197,12 @@ export async function listTransactions(req: Request, res: Response) {
     if (from) q.createdAt.$gte = new Date(from);
     if (to) q.createdAt.$lte = new Date(to);
   }
-  const skip = (Number(page) - 1) * Number(pageSize);
+  const skip = (Number(page) - 1) * Number(perPage);
   const [items, total] = await Promise.all([
     WalletTransaction.find(q)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(Number(pageSize))
+      .limit(Number(perPage))
       .lean(),
     WalletTransaction.countDocuments(q),
   ]);
@@ -209,6 +210,6 @@ export async function listTransactions(req: Request, res: Response) {
     transactions: items,
     total,
     page: Number(page),
-    pageSize: Number(pageSize),
+    pageSize: Number(perPage),
   });
 }

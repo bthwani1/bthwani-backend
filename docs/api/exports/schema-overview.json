@@ -1,0 +1,510 @@
+{
+  "entities": [
+    {
+      "name": "Relati",
+      "attributes": []
+    },
+    {
+      "name": "nship",
+      "attributes": []
+    },
+    {
+      "name": "Fav",
+      "attributes": []
+    },
+    {
+      "name": "rite",
+      "attributes": []
+    },
+    {
+      "name": "Notificati",
+      "attributes": []
+    },
+    {
+      "name": "n",
+      "attributes": []
+    },
+    {
+      "name": "Transacti",
+      "attributes": []
+    },
+    {
+      "name": "Order",
+      "attributes": []
+    },
+    {
+      "name": "o",
+      "attributes": []
+    },
+    {
+      "name": "N",
+      "attributes": []
+    },
+    {
+      "name": "te",
+      "attributes": []
+    },
+    {
+      "name": "DeliverySt",
+      "attributes": []
+    },
+    {
+      "name": "re",
+      "attributes": []
+    },
+    {
+      "name": "DeliveryStore",
+      "attributes": []
+    },
+    {
+      "name": "DriverLocati",
+      "attributes": []
+    },
+    {
+      "name": "Vacati",
+      "attributes": []
+    },
+    {
+      "name": "nRequest",
+      "attributes": []
+    },
+    {
+      "name": "TopupL",
+      "attributes": []
+    },
+    {
+      "name": "g",
+      "attributes": []
+    },
+    {
+      "name": "ChartAcc",
+      "attributes": []
+    },
+    {
+      "name": "unt",
+      "attributes": []
+    },
+    {
+      "name": "J",
+      "attributes": []
+    },
+    {
+      "name": "urnalEntry",
+      "attributes": []
+    },
+    {
+      "name": "AdminL",
+      "attributes": []
+    },
+    {
+      "name": "Commissi",
+      "attributes": []
+    },
+    {
+      "name": "nPlan",
+      "attributes": []
+    },
+    {
+      "name": "Vend",
+      "attributes": []
+    },
+    {
+      "name": "r",
+      "attributes": []
+    },
+    {
+      "name": "nRule",
+      "attributes": []
+    },
+    {
+      "name": "OrderItem",
+      "attributes": []
+    },
+    {
+      "name": "DeliveryProduct",
+      "attributes": []
+    },
+    {
+      "name": "MerchantProduct",
+      "attributes": []
+    },
+    {
+      "name": "User",
+      "attributes": []
+    },
+    {
+      "name": "Driver",
+      "attributes": []
+    },
+    {
+      "name": "Review",
+      "attributes": []
+    },
+    {
+      "name": "Inventory",
+      "attributes": []
+    },
+    {
+      "name": "Analytics",
+      "attributes": []
+    },
+    {
+      "name": "Pr",
+      "attributes": []
+    },
+    {
+      "name": "file",
+      "attributes": []
+    },
+    {
+      "name": "ns",
+      "attributes": []
+    },
+    {
+      "name": "rites",
+      "attributes": []
+    },
+    {
+      "name": "T",
+      "attributes": []
+    },
+    {
+      "name": "pup",
+      "attributes": []
+    },
+    {
+      "name": "Cust",
+      "attributes": []
+    },
+    {
+      "name": "mer",
+      "attributes": []
+    },
+    {
+      "name": "St",
+      "attributes": []
+    },
+    {
+      "name": "Hist",
+      "attributes": []
+    },
+    {
+      "name": "ry",
+      "attributes": []
+    },
+    {
+      "name": "tes",
+      "attributes": []
+    },
+    {
+      "name": "ducts",
+      "attributes": []
+    },
+    {
+      "name": "Act",
+      "attributes": []
+    },
+    {
+      "name": "rs",
+      "attributes": []
+    },
+    {
+      "name": "res",
+      "attributes": []
+    },
+    {
+      "name": "Locati",
+      "attributes": []
+    },
+    {
+      "name": "Descripti",
+      "attributes": []
+    },
+    {
+      "name": "Categ",
+      "attributes": []
+    },
+    {
+      "name": "Co",
+      "attributes": []
+    },
+    {
+      "name": "rdinates",
+      "attributes": []
+    },
+    {
+      "name": "C",
+      "attributes": []
+    },
+    {
+      "name": "verage",
+      "attributes": []
+    },
+    {
+      "name": "ries",
+      "attributes": []
+    },
+    {
+      "name": "H",
+      "attributes": []
+    },
+    {
+      "name": "urs",
+      "attributes": []
+    },
+    {
+      "name": "Perf",
+      "attributes": []
+    },
+    {
+      "name": "rmance",
+      "attributes": []
+    },
+    {
+      "name": "Pers",
+      "attributes": []
+    },
+    {
+      "name": "nal",
+      "attributes": []
+    },
+    {
+      "name": "Verificati",
+      "attributes": []
+    },
+    {
+      "name": "me",
+      "attributes": []
+    },
+    {
+      "name": "Acc",
+      "attributes": []
+    },
+    {
+      "name": "unting",
+      "attributes": []
+    },
+    {
+      "name": "Chart",
+      "attributes": []
+    },
+    {
+      "name": "f",
+      "attributes": []
+    },
+    {
+      "name": "urnal",
+      "attributes": []
+    },
+    {
+      "name": "tal",
+      "attributes": []
+    },
+    {
+      "name": "Rep",
+      "attributes": []
+    },
+    {
+      "name": "rts",
+      "attributes": []
+    },
+    {
+      "name": "Fl",
+      "attributes": []
+    },
+    {
+      "name": "w",
+      "attributes": []
+    },
+    {
+      "name": "DeliveryPr",
+      "attributes": []
+    },
+    {
+      "name": "duct",
+      "attributes": []
+    },
+    {
+      "name": "MerchantPr",
+      "attributes": []
+    },
+    {
+      "name": "br",
+      "attributes": []
+    },
+    {
+      "name": "Wallet",
+      "attributes": []
+    },
+    {
+      "name": "Supp",
+      "attributes": []
+    },
+    {
+      "name": "rting",
+      "attributes": []
+    },
+    {
+      "name": "Address",
+      "attributes": []
+    },
+    {
+      "name": "nships",
+      "attributes": []
+    },
+    {
+      "name": "1",
+      "attributes": []
+    },
+    {
+      "name": "M",
+      "attributes": []
+    },
+    {
+      "name": "Product",
+      "attributes": []
+    },
+    {
+      "name": "Store",
+      "attributes": []
+    },
+    {
+      "name": "Transaction",
+      "attributes": []
+    },
+    {
+      "name": "Cr",
+      "attributes": []
+    },
+    {
+      "name": "ss",
+      "attributes": []
+    },
+    {
+      "name": "Ge",
+      "attributes": []
+    },
+    {
+      "name": "graphic",
+      "attributes": []
+    },
+    {
+      "name": "Z",
+      "attributes": []
+    },
+    {
+      "name": "nes",
+      "attributes": []
+    },
+    {
+      "name": "Destinati",
+      "attributes": []
+    },
+    {
+      "name": "Calculati",
+      "attributes": []
+    },
+    {
+      "name": "R",
+      "attributes": []
+    },
+    {
+      "name": "ute",
+      "attributes": []
+    },
+    {
+      "name": "fl",
+      "attributes": []
+    },
+    {
+      "name": "wchart",
+      "attributes": []
+    },
+    {
+      "name": "cessing",
+      "attributes": []
+    },
+    {
+      "name": "Preparati",
+      "attributes": []
+    },
+    {
+      "name": "Completi",
+      "attributes": []
+    },
+    {
+      "name": "Monit",
+      "attributes": []
+    },
+    {
+      "name": "ring",
+      "attributes": []
+    },
+    {
+      "name": "Dashb",
+      "attributes": []
+    },
+    {
+      "name": "ard",
+      "attributes": []
+    },
+    {
+      "name": "Optimizati",
+      "attributes": []
+    },
+    {
+      "name": "Endp",
+      "attributes": []
+    },
+    {
+      "name": "ints",
+      "attributes": []
+    },
+    {
+      "name": "Operati",
+      "attributes": []
+    },
+    {
+      "name": "Resp",
+      "attributes": []
+    },
+    {
+      "name": "nse",
+      "attributes": []
+    },
+    {
+      "name": "reSchema",
+      "attributes": []
+    },
+    {
+      "name": "locati",
+      "attributes": []
+    },
+    {
+      "name": "ductSchema",
+      "attributes": []
+    },
+    {
+      "name": "Paginati",
+      "attributes": []
+    },
+    {
+      "name": "Aggregati",
+      "attributes": []
+    },
+    {
+      "name": "l",
+      "attributes": []
+    },
+    {
+      "name": "gging",
+      "attributes": []
+    },
+    {
+      "name": "sanitizati",
+      "attributes": []
+    }
+  ],
+  "totalEntities": 126,
+  "exportedAt": "2025-10-10T21:03:42.366Z"
+}

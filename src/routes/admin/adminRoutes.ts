@@ -1,16 +1,15 @@
-// src/routes/admin/userAdminRoutes.ts
+// src/routes/admin/adminRoutes.ts
 
 import { Router, Request, Response } from "express";
 import {
-  createAdminUser,
   getAllUsers,
-  getUserById,
-  updateAdminUser,
+
   updateUserAdmin,
   updateUserRole,
 } from "../../controllers/admin/adminUserController";
 import { verifyFirebase } from "../../middleware/verifyFirebase";
 import { verifyAdmin } from "../../middleware/verifyAdmin";
+import { requirePermission } from "../../middleware/rbac";
 import { User } from "../../models/user";
 import { getAdminStats } from "../../controllers/admin/adminUserController";
 import { getDeliveryKPIs } from "../../controllers/admin/adminDeliveryController";
@@ -18,25 +17,29 @@ import { listUsersStats } from "../../models/delivery_marketplace_v1/adminUsers"
 
 const router = Router();
 
-router.patch("/users/:id", verifyFirebase, updateUserAdmin);
+// Apply Firebase authentication to all admin routes
+router.use(verifyFirebase);
 
-router.patch("/users/:id/role", verifyFirebase, verifyAdmin, updateUserRole);
+// Admin Users Management - requires admin.users permission
+router.patch("/users/:id", requirePermission('admin.users', 'edit'), updateUserAdmin);
+router.patch("/users/:id/role", verifyAdmin, updateUserRole);
 
+// Role checking endpoint - available to all authenticated admins
 router.get(
   "/check-role",
-  verifyFirebase,
   async (req: Request, res: Response) => {
-    const firebaseUser = (req as any).firebaseUser; // set by verifyFirebase
-    const uid = firebaseUser?.uid; // <-- هذا هو الحقل الصحيح
+    const firebaseUser = (req as any).firebaseUser;
+    const uid = firebaseUser?.uid;
     const email = firebaseUser?.email;
 
     if (!uid) {
-      res.status(401).json({ message: "Unauthorized (no uid)" });
+      res.status(401).json({
+        error: { code: "AUTHENTICATION_REQUIRED", message: "Authentication required" }
+      });
       return;
     }
 
     try {
-      // ابحث بالمطابقة على firebaseUID أو البريد كخيار ثانٍ
       const user = await User.findOne({
         $or: [{ firebaseUID: uid }, { email }],
       })
@@ -44,46 +47,72 @@ router.get(
         .lean();
 
       if (!user) {
-        res.status(404).json({ message: "User not found" });
+        res.status(404).json({
+          error: { code: "USER_NOT_FOUND", message: "User not found" }
+        });
         return;
       }
 
-      res.json({ role: user.role });
+      res.json({
+        role: user.role,
+        permissions: {}
+      });
     } catch (e: any) {
-      res.status(500).json({ message: e.message || "Server error" });
+      res.status(500).json({
+        error: { code: "INTERNAL_ERROR", message: e.message || "Server error" }
+      });
     }
   }
 );
 
-router.get("/stats", verifyFirebase, verifyAdmin, getAdminStats);
+// Admin Statistics - requires admin.stats permission
+router.get("/stats", requirePermission('admin.stats', 'read'), getAdminStats);
+router.get("/delivery/kpis", requirePermission('admin.reports', 'read'), getDeliveryKPIs);
 
-router.get("/delivery/kpis", verifyFirebase, verifyAdmin, getDeliveryKPIs);
+// Store Statistics - requires admin.stores permission and ownership check
+router.get("/delivery/stores/:storeId/stats",
+  requirePermission('admin.stores', 'read'),
+  async (req, res) => {
+    const storeId = req.params.storeId;
 
-router.get("/delivery/stores/:storeId/stats", async (req, res) => {
-  const storeId = req.params.storeId;
+    // جلب الإحصائيات اليومية
+    const dailyStats = await getStoreStats(storeId, "daily");
 
-  // جلب الإحصائيات اليومية
-  const dailyStats = await getStoreStats(storeId, "daily");
+    // جلب الإحصائيات الأسبوعية
+    const weeklyStats = await getStoreStats(storeId, "weekly");
 
-  // جلب الإحصائيات الأسبوعية
-  const weeklyStats = await getStoreStats(storeId, "weekly");
+    // جلب الإحصائيات الشهرية
+    const monthlyStats = await getStoreStats(storeId, "monthly");
 
-  // جلب الإحصائيات الشهرية
-  const monthlyStats = await getStoreStats(storeId, "monthly");
+    res.json({
+      dailyStats,
+      weeklyStats,
+      monthlyStats,
+    });
+  }
+);
 
-  res.json({
-    dailyStats,
-    weeklyStats,
-    monthlyStats,
-  });
-});
-router.get("/users", verifyFirebase, verifyAdmin, listUsersStats);
+// Users List - requires admin.users permission
+router.get("/users", requirePermission('admin.users', 'read'), listUsersStats);
+router.get("/users/list", requirePermission('admin.users', 'read'), getAllUsers);
 
-// إشعارات إدارية (استخدام الملف الموجود)
-router.use("/notifications", verifyFirebase, verifyAdmin, require('../../routes/admin/admin.notifications.routes').default);
+// Admin Notifications - requires admin.notifications permission
+router.use("/notifications",
+  requirePermission('admin.notifications', 'read'),
+  require('../../routes/admin/admin.notifications.routes').default
+);
 
-// مالية السائقين (استخدام الملف الموجود)
-router.use("/drivers/finance", verifyFirebase, verifyAdmin, require('../../routes/admin/drivers.finance').default);
+// Audit Logs - requires admin.audit permission
+router.use("/",
+  requirePermission('admin.audit', 'read'),
+  require('../../routes/admin/audit.routes').default
+);
+
+// Driver Finance - requires admin.drivers permission
+router.use("/drivers/finance",
+  requirePermission('admin.drivers', 'read'),
+  require('../../routes/admin/drivers.finance').default
+);
 
 const getStoreStats = async (
   storeId: string,

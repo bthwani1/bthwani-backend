@@ -6,6 +6,12 @@ import DeliveryProduct from "../../models/delivery_marketplace_v1/DeliveryProduc
 
 const router = Router();
 
+/**
+ * Get store statistics by period
+ * GET /:storeId/stats/:period
+ * Where period can be: daily, weekly, monthly, all
+ * This route is designed to avoid conflicts with other stats routes
+ */
 router.get("/:storeId/stats/:period", async (req, res) => {
   const { storeId, period } = req.params as {
     storeId: string;

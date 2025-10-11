@@ -14,6 +14,15 @@ export const quickOnboard = async (req: Request, res: Response) => {
     // هنا نحصل الـ uid الذي يضعه verifyMarketerJWT (decoded.id)
     const marketerId = (req.user as any)?.id;
 
+    // تطبيع الحقول في participants
+    const normalizedParticipants = Array.isArray(participants) && participants.length
+      ? participants.map((p: any) => ({
+          marketerId: p.uid || marketerId,
+          role: p.role || "lead",
+          weight: typeof p.weight === "number" ? p.weight : 1,
+        }))
+      : [{ marketerId, role: "lead", weight: 1 }];
+
     // تحقق من المدخلات الأساسية
     if (
       !store ||
@@ -69,7 +78,7 @@ export const quickOnboard = async (req: Request, res: Response) => {
     // Idempotency: لو أعطيت مفتاح + uid، ابحث عن تكرار
     if (idempotencyKey && marketerId) {
       const dup = await DeliveryStore.findOne({
-        createdByMarketerUid: marketerId,
+        createdByMarketerId: marketerId,
         "meta.idempotencyKey": idempotencyKey,
       }).lean();
       if (dup) {
@@ -106,8 +115,8 @@ export const quickOnboard = async (req: Request, res: Response) => {
           : [],
         isActive: true,
         forceClosed: true,
-        createdByMarketerUid: marketerId,
-        participants: Array.isArray(participants) ? participants : [],
+        createdByMarketerId: marketerId,
+        participants: normalizedParticipants,
         source: "marketerQuickOnboard",
         meta: { idempotencyKey },
       });
@@ -122,7 +131,7 @@ export const quickOnboard = async (req: Request, res: Response) => {
         password: hash,
         store: storeDoc._id,
         isActive: true,
-        createdByMarketerUid: marketerId,
+        createdByMarketerId: marketerId,
         source: "marketerQuickOnboard",
       });
       await vendorDoc.save({ session });

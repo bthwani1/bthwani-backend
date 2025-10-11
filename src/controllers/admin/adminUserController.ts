@@ -5,21 +5,38 @@ import {
   AdminRole,
 
 } from "../../models/admin/AdminUser";
+import { parseListQuery } from "../../utils/query";
 
 // ✅ عرض كل المستخدمين
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
-    const { role, isVerified, isBanned } = req.query;
+    const { page, perPage, q, sort, filters } = parseListQuery(req.query);
 
     const filter: any = {};
-    if (role) filter.role = role;
-    if (isVerified !== undefined) filter.isVerified = isVerified === "true";
-    if (isBanned !== undefined) filter.isBanned = isBanned === "true";
+    if (filters?.role) filter.role = filters.role;
+    if (typeof req.query.isVerified !== "undefined") filter.isVerified = req.query.isVerified === "true";
+    if (typeof req.query.isBanned !== "undefined") filter.isBanned = req.query.isBanned === "true";
+    if (q) filter.$or = [{ fullName: new RegExp(q, "i") }, { phone: new RegExp(q, "i") }, { email: new RegExp(q, "i") }];
 
-    const users = await User.find(filter).select(
-      "-security -wallet -activityLog"
-    );
-    res.json(users);
+    const total = await User.countDocuments(filter);
+    const users = await User.find(filter)
+      .select("-security -wallet -activityLog")
+      .sort(sort ?? { createdAt: -1 })
+      .skip((page - 1) * perPage)
+      .limit(perPage)
+      .lean();
+
+    res.json({
+      users,
+      pagination: {
+        page,
+        limit: perPage,
+        total,
+        pages: Math.ceil(total / perPage),
+      },
+      items: users,
+      meta: { page, per_page: perPage, total, returned: users.length },
+    });
   } catch (err) {
     res.status(500).json({ message: "Error fetching users", error: err });
   }

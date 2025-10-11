@@ -12,12 +12,15 @@ import { verifyTokenSocket } from "./middleware/verifyTokenSocket";
 // استيراد Routes (كما عندك)
 import adminRoutes from "./routes/admin/adminRoutes";
 import adminWithdrawalRoutes from "./routes/admin/admin.withdrawal.routes";
+import dataDeletionRoutes from "./routes/admin/dataDeletionRoutes";
+import backupRoutes from "./routes/admin/backupRoutes";
 import userRoutes from "./routes/userRoutes";
 import mediaRoutes from "./routes/mediaRoutes";
 import driverRoutes from "./routes/driver_app/driver.routes";
 import adminDriverRoutes from "./routes/admin/admin.driver.routes";
 import topupRoutes from "./routes/Wallet_V8/topupRoutes";
 import driverWithdrawalRoutes from "./routes/driver_app/driver.withdrawal.routes";
+import driverVacationRoutes from "./routes/driver_app/driver.vacation.routes";
 import vendorRoutes from "./routes/vendor_app/vendor.routes";
 import settlementRoutes from "./routes/vendor_app/settlement.routes";
 import storeStatsRoutes from "./routes/admin/storeStatsRoutes";
@@ -29,7 +32,6 @@ import deliveryBannerRoutes from "./routes/delivery_marketplace_v1/DeliveryBanne
 import DeliveryOfferRoutes from "./routes/delivery_marketplace_v1/DeliveryOfferRoutes";
 import deliveryCartRouter from "./routes/delivery_marketplace_v1/DeliveryCartRoutes";
 import deliveryOrderRoutes from "./routes/delivery_marketplace_v1/DeliveryOrderRoutes";
-import StatestoreRoutes from "./routes/admin/storeStatsRoutes";
 import employeeRoutes from "./routes/er/employee.routes";
 import attendanceRoutes from "./routes/er/attendance.routes";
 import leaveRequestRoutes from "./routes/er/leaveRequest.routes";
@@ -46,6 +48,8 @@ import pushRouter from "./push";
 import { initIndexesAndValidate } from "./bootstrap/indexes";
 import { registerRoasCron } from "./cron/roas";
 import { registerAdSpendCron } from "./cron/adspend";
+import { registerAccountCleanupCron } from "./cron/account-cleanup";
+import { registerBackupCron } from "./cron/backup";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import tz from "dayjs/plugin/timezone";
@@ -67,14 +71,16 @@ import quickOnboardRoutes from "./routes/field/quickOnboard.routes";
 import marketingAuthRoutes from "./routes/marketerV1/auth.routes";
 import onboardingRoutes from "./routes/field/onboarding.routes";
 import mediaMarketerRoutes from "./routes/marketerV1/mediaMarketerRoutes";
+import referralRoutes from "./routes/field/referral.routes";
 import walletOrderRoutes from "./routes/Wallet_V8/walletOrderRoutes";
-import supportRoutes from "./routes/support.routes";
 import appRoutes from "./routes/app.routes";
 import walletRoutes from "./routes/Wallet_V8/wallet.routes";
 import metaRoutes from "./routes/meta";
 import adminCmsRoutes from "./routes/admin/admin.cms.routes";
 import cmsRoutes from "./routes/cms.routes";
 import dashboardOverviewRoutes from "./routes/admin/dashboardOverview.routes";
+import testOtpRoutes from "./routes/testOtp";
+import authRoutes from "./routes/auth.routes";
 
 // Missing route imports
 import adminWalletCouponsRoutes from "./routes/admin/admin.wallet.coupons";
@@ -85,6 +91,11 @@ import driversDocsRoutes from "./routes/admin/drivers.docs";
 import driversFinanceRoutes from "./routes/admin/drivers.finance";
 import driversShiftsRoutes from "./routes/admin/drivers.shifts";
 import adminNotificationRoutes2 from "./routes/admin/notification.routes";
+import adminDriverVacationsRoutes from "./routes/admin/admin.driver.vacations.routes";
+import driversLeaveRoutes from "./routes/admin/drivers.leave.routes";
+import settingsRoutes from "./routes/admin/settings.routes";
+import qualityRoutes from "./routes/admin/quality.routes";
+import supportRoutes from "./routes/admin/support.routes";
 
 // ER routes
 import accountPayableRoutes from "./routes/er/accountPayable.routes";
@@ -114,7 +125,9 @@ import supportRoutes2 from "./routes/support";
 import userAvatarRoutes from "./routes/userAvatarRoutes";
 import couponRoutes from "./routes/Wallet_V8/coupon.routes";
 import subscriptionRoutes from "./routes/Wallet_V8/subscription.routes";
-  
+import adminManagementRoutes from "./routes/admin/adminManagementRoutes";
+import DeliveryStoreRoutes from "./routes/delivery_marketplace_v1/DeliveryStoreRoutes";
+
 dotenv.config();
 console.log("[BOOT] pid:", process.pid, "build:", new Date().toISOString());
 
@@ -129,17 +142,53 @@ dayjs.extend(utc);
 dayjs.extend(tz);
 dayjs.tz.setDefault("Asia/Aden");
 process.env.TZ = "Asia/Aden";
-// Socket.IO middleware/setup (يظل كما هو)
+// Socket.IO middleware/setup
 io.use(verifyTokenSocket);
 io.on("connection", (socket) => {
   const uid = socket.data.uid;
-  if (uid) socket.join(`user_${uid}`);
+
+  // الانضمام الافتراضي لغرفة المستخدم
+  if (uid) {
+    socket.join(`user_${uid}`);
+  }
+
+  // الانضمام لغرفة الإدارة (للمشرفين فقط)
+  socket.on("admin:subscribe", () => {
+    if (socket.data.role === "admin" || socket.data.role === "super_admin") {
+      socket.join("orders_admin");
+    }
+  });
+
+  // الانضمام لغرفة طلب محدد
+  socket.on("join:order", (data: { orderId: string }) => {
+    socket.join(`order_${data.orderId}`);
+  });
+
+  // مغادرة غرفة طلب محدد
+  socket.on("leave:order", (data: { orderId: string }) => {
+    socket.leave(`order_${data.orderId}`);
+  });
+
+  // الانضمام لغرفة سائق محدد (للتطبيقات المحمولة)
+  socket.on("join:driver", (data: { driverId: string }) => {
+    socket.join(`driver_${data.driverId}`);
+  });
+
+  // الانضمام لغرفة تاجر محدد (للتطبيقات المحمولة)
+  socket.on("join:vendor", (data: { vendorId: string }) => {
+    socket.join(`vendor_${data.vendorId}`);
+  });
+
   socket.on("disconnect", () => {
     if (uid) socket.leave(`user_${uid}`);
   });
 });
 // إذا لديك مزيد من registerSupportSocket(io);
 registerSupportSocket(io);
+
+// استيراد وتفعيل Fallback Polling
+import { pollingService } from "./services/pollingService";
+pollingService.startPolling();
 // Middleware
 app.use(
   cors({
@@ -158,7 +207,10 @@ const API_PREFIX = "/api/v1";
 app.use((req, res, next) => {
   if (req.path.startsWith("/api/v1") && req.method === "POST") {
     console.log(">>> INCOMING REQ:", req.method, req.originalUrl);
-    console.log(">>> Authorization header:", req.headers.authorization);
+    // Only log authorization header in development
+    if (process.env.NODE_ENV !== "production") {
+      console.log(">>> Authorization header:", req.headers.authorization);
+    }
   }
   next();
 });
@@ -170,12 +222,17 @@ app.use(`${API_PREFIX}/delivery/categories`, deliveryCategoryRoutes);
 app.use(`${API_PREFIX}/delivery/order`, deliveryOrderRoutes);
 
 app.use(`${API_PREFIX}/auth`, marketingAuthRoutes);
+app.use(`${API_PREFIX}/auth/jwt`, authRoutes); // JWT refresh/logout endpoints
 app.use(`${API_PREFIX}/reports/marketers`, marketerReports);
 app.use(`${API_PREFIX}/field/onboarding`, onboardingRoutes);
 app.use(`${API_PREFIX}/files`, mediaMarketerRoutes);
 app.use(`${API_PREFIX}/field`, quickOnboardRoutes);
+app.use(`${API_PREFIX}/referrals`, referralRoutes);
 app.use(`${API_PREFIX}/admin/dashboard`, dashboardOverviewRoutes);
 app.use(`${API_PREFIX}/driver`, driverRoutes);
+app.use(`${API_PREFIX}/admin/users`, adminManagementRoutes);
+app.use(`${API_PREFIX}/admin/data-deletion`, dataDeletionRoutes);
+app.use(`${API_PREFIX}/admin/backups`, backupRoutes);
 
 
 app.use(`${API_PREFIX}/vendor`, vendorRoutes);
@@ -233,11 +290,12 @@ app.use(`${API_PREFIX}/marketer`, marketerStoreVendorRoutes);
 app.use(`${API_PREFIX}/marketer/overview`, marketerOverviewRoutes);
 app.use(`${API_PREFIX}/admin/field/onboarding`, adminOnboarding);
 app.use(`${API_PREFIX}/admin/commission-plans`, adminCommission);
-app.use(`${API_PREFIX}/delivery/stores`, StatestoreRoutes);
+app.use(`${API_PREFIX}/delivery/stores`, DeliveryStoreRoutes);
 
 app.use(`${API_PREFIX}/admin/marketer-stores`, adminStoreModeration);
 app.use(`${API_PREFIX}/admin/activation`, activationRoutes);
-app.use(`${API_PREFIX}/deliveryapp/withdrawals`, driverWithdrawalRoutes);
+app.use(`${API_PREFIX}/driver/withdrawals`, driverWithdrawalRoutes);
+app.use(`${API_PREFIX}/driver/vacations`, driverVacationRoutes);
 app.use(`${API_PREFIX}/admin/debug/redis`, rediasRoutes);
 app.use(`${API_PREFIX}/pricing-strategies`, pricingStrategyRoutes);
 app.use(`${API_PREFIX}/marketing`, marketingRouter);
@@ -251,6 +309,11 @@ app.use(`${API_PREFIX}/admin/drivers/attendance`, driversAttendanceRoutes);
 app.use(`${API_PREFIX}/admin/drivers/docs`, driversDocsRoutes);
 app.use(`${API_PREFIX}/admin/drivers/finance`, driversFinanceRoutes);
 app.use(`${API_PREFIX}/admin/drivers/shifts`, driversShiftsRoutes);
+app.use(`${API_PREFIX}/admin/drivers/vacations`, adminDriverVacationsRoutes);
+app.use(`${API_PREFIX}/admin/drivers/leave-requests`, driversLeaveRoutes);
+app.use(`${API_PREFIX}/admin/settings`, settingsRoutes);
+app.use(`${API_PREFIX}/admin/quality`, qualityRoutes);
+app.use(`${API_PREFIX}/admin/support`, supportRoutes);
 app.use(`${API_PREFIX}/admin/notifications/v2`, adminNotificationRoutes2);
 
 // ER routes
@@ -281,6 +344,17 @@ app.use(`${API_PREFIX}/support/v2`, supportRoutes2);
 app.use(`${API_PREFIX}/users/avatar`, userAvatarRoutes);
 app.use(`${API_PREFIX}/wallet/coupons`, couponRoutes);
 app.use(`${API_PREFIX}/wallet/subscriptions`, subscriptionRoutes);
+
+// Test OTP endpoints (للاختبار فقط)
+app.use(`${API_PREFIX}/test/otp`, testOtpRoutes);
+
+// Swagger documentation
+import { swaggerUi, specs } from "./bootstrap/swagger";
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
+
+// Global error handler (must be last)
+import { errorHandler } from "./middleware/errorHandler";
+app.use(errorHandler);
 
 app.get("/", (_, res) => {
   res.send("bThwani backend is running ✅");
@@ -342,6 +416,8 @@ const startServer = async () => {
     try {
       registerAdSpendCron();
       registerRoasCron();
+      registerAccountCleanupCron();
+      registerBackupCron();
       // if you have initCampaignQueue(redisConn) call it here
     } catch (err) {
       console.warn("⚠️ Failed to init cron/queues (continuing):", err);

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import Order from "../../models/delivery_marketplace_v1/Order";
 import Driver from "../../models/Driver_app/driver"; // ← هذا الاستيراد مطلوب
 import { ensureGLForDriver } from "../../accounting/services/ensureEntityGL";
+import { parseListQuery } from "../../utils/query";
 
 export const createDriver = async (req: Request, res: Response) => {
   try {
@@ -121,15 +122,31 @@ export const verifyDriver = async (req: Request, res: Response) => {
 };
 
 export const listDrivers = async (req: Request, res: Response) => {
-  const { role, city, isAvailable } = req.query;
+  const { page, perPage, q, sort, filters } = parseListQuery(req.query);
 
   const filter: any = {};
-  if (role) filter.role = role;
-  if (city) filter.city = city;
-  if (isAvailable !== undefined) filter.isAvailable = isAvailable === "true";
+  if (filters?.role) filter.role = filters.role;
+  if (filters?.city) filter.city = filters.city;
+  if (typeof req.query.isAvailable !== "undefined")
+    filter.isAvailable = req.query.isAvailable === "true";
+  if (q) filter.$or = [{ fullName: new RegExp(q, "i") }, { phone: new RegExp(q, "i") }];
 
-  const drivers = await Driver.find(filter).select("-password");
-  res.json(drivers);
+  const total = await Driver.countDocuments(filter);
+  const drivers = await Driver.find(filter).select("-password")
+    .sort(sort ?? { createdAt: -1 })
+    .skip((page - 1) * perPage)
+    .limit(perPage)
+    .lean();
+
+  res.json({
+    drivers,
+    total,
+    page,
+    pageSize: perPage, // توافقًا مع الواجهة
+    // شكل موحّد
+    items: drivers,
+    meta: { page, per_page: perPage, total, returned: drivers.length },
+  });
 };
 
 export const resetPassword = async (req: Request, res: Response) => {

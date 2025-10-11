@@ -27,6 +27,10 @@ export interface IDriver extends Document {
   // متر | دراجة | سيارة
   vehicleType: "motor" | "bike" | "car";
 
+  // تصنيف المركبة وقوتها للفلترة
+  vehicleClass: { type: String, enum: ["light", "medium", "heavy"], default: "light", index: true };
+  vehiclePower: { type: Number, default: 0, index: true }; // cc أو kW حسب تعريفك
+
   glReceivableAccount?: Types.ObjectId;
   glDepositAccount?: Types.ObjectId;
   // نوع المندوب من البداية
@@ -98,6 +102,19 @@ const DriverSchema = new Schema<IDriver>(
       type: String,
       enum: ["motor", "bike", "car"],
       required: true
+    },
+
+    // تصنيف المركبة وقوتها للفلترة
+    vehicleClass: {
+      type: String,
+      enum: ["light", "medium", "heavy"],
+      default: "light",
+      index: true
+    },
+    vehiclePower: {
+      type: Number,
+      default: 0,
+      index: true
     },
 
     // هنا نختار "primary" أو "joker" عند الإنشاء

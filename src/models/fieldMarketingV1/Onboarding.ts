@@ -27,6 +27,8 @@ export interface IOnboarding extends Document {
   reviewedBy?: Types.ObjectId;
   notes?: string; // للـ needs_fix أو الرفض
   createdByMarketerId: string; // منشئ الطلب (المسوّق)
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const Sch = new Schema<IOnboarding>(

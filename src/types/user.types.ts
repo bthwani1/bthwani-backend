@@ -18,7 +18,7 @@ export interface Wallet {
   lastUpdated: Date;
   loyaltyPoints: number;
   onHold: number;
-
+  transactions: Transaction[];
   escrow: number;
   savings: number;
 }
@@ -181,7 +181,6 @@ export interface UserType {
 
   wallet: Wallet;
   security: Security;
-  transactions: Transaction[];
   activityLog: ActivityLog[];
 }
 

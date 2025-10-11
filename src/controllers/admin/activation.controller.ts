@@ -13,7 +13,13 @@ export const activateStore = async (req: Request, res: Response) => {
     res.status(404).json({ message: "Store not found" });
     return;
   }
-  res.json({ ok: true, store: s });
+  res.json({
+    ok: true,
+    store: s,
+    createdByMarketer: s.createdByMarketerUid ? {
+      uid: s.createdByMarketerUid,
+    } : null
+  });
 };
 
 export const activateVendor = async (req: Request, res: Response) => {

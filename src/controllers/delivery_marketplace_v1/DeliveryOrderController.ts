@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { parseListQuery } from "../../utils/query";
 import DeliveryOrder, {
   OrderStatus,
 } from "../../models/delivery_marketplace_v1/Order";
@@ -1737,6 +1738,7 @@ export const getOrderById = async (req: Request, res: Response) => {
 };
 export const getAllOrders = async (req: Request, res: Response) => {
   try {
+    const { page, perPage, sort } = parseListQuery(req.query);
     const { status, city, storeId, driverId, from, to, paymentMethod } =
       req.query as any;
 
@@ -1766,15 +1768,29 @@ export const getAllOrders = async (req: Request, res: Response) => {
 
     const filter = and.length ? { $and: and } : {};
 
+    const total = await DeliveryOrder.countDocuments(filter);
     const orders = await DeliveryOrder.find(filter)
-      .sort({ createdAt: -1 })
+      .sort(sort ?? { createdAt: -1 })
+      .skip((page - 1) * perPage)
+      .limit(perPage)
       .populate({ path: "user", select: "fullName name email phone" })
       .populate({ path: "driver", select: "fullName phone" })
       .populate({ path: "subOrders.store", select: "name logo address" })
       .populate({ path: "subOrders.driver", select: "fullName phone" })
-      .populate({ path: "items.store", select: "name logo" });
+      .populate({ path: "items.store", select: "name logo" })
+      .lean();
 
-    res.json(orders);
+    res.json({
+      orders,
+      pagination: {
+        page,
+        limit: perPage,
+        total,
+        pages: Math.ceil(total / perPage),
+      },
+      items: orders,
+      meta: { page, per_page: perPage, total, returned: orders.length },
+    });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

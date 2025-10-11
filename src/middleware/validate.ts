@@ -1,6 +1,7 @@
 // src/middleware/validate.ts
 import { Request, Response, NextFunction } from "express";
 import { z, ZodSchema } from "zod";
+import { ERR } from "../utils/errors";
 
 export interface ValidationOptions {
   body?: ZodSchema;
@@ -30,11 +31,11 @@ export const validate = (schemas: ValidationOptions) => {
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({
-          message: "Validation error",
-          errors: (error as any).errors.map((err: any) => ({
-            field: err.path.join("."),
-            message: err.message,
-            code: err.code,
+          error: { code: "VALIDATION_FAILED", message: "Validation error" },
+          errors: (error as any).errors.map((e) => ({
+            field: e.path.join("."),
+            message: e.message,
+            code: e.code,
           })),
         });
         return;
@@ -66,11 +67,11 @@ export const validate2 = (schema: any) => {
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({
-          message: "Validation error",
-          errors: (error as any).errors.map((err: any) => ({
-            field: err.path.join("."),
-            message: err.message,
-            code: err.code,
+          error: { code: "VALIDATION_FAILED", message: "Validation error" },
+          errors: (error as any).errors.map((e) => ({
+            field: e.path.join("."),
+            message: e.message,
+            code: e.code,
           })),
         });
         return;

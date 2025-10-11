@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import Onboarding from "../../models/fieldMarketingV1/Onboarding";
+import CommissionPlan from "../../models/fieldMarketingV1/CommissionPlan";
 
 function dt(s?: string) {
   return s ? new Date(s) : undefined;
@@ -19,21 +20,86 @@ export async function overview(req: Request, res: Response, next: NextFunction) 
 
     const base = await Onboarding.aggregate([
       { $match: match },
-      { $unwind: "$participants" },
       {
         $group: {
-          _id: "$participants.marketerId",
+          _id: {
+            $cond: [
+              { $gt: [{ $size: "$participants" }, 0] },
+              { $arrayElemAt: ["$participants.marketerId", 0] },
+              "$createdByMarketerId"
+            ]
+          },
+          submitted: {
+            $sum: { $cond: [{ $eq: ["$status", "submitted"] }, 1, 0] },
+          },
+          approved: {
+            $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] },
+          },
+          rejected: {
+            $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] },
+          },
+          needsFix: {
+            $sum: { $cond: [{ $eq: ["$status", "needs_fix"] }, 1, 0] },
+          },
           submittedW: {
-            $sum: { $cond: [{ $eq: ["$status", "submitted"] }, { $ifNull: ["$participants.weight", 0.5] }, 0] },
+            $sum: {
+              $cond: [
+                { $eq: ["$status", "submitted"] },
+                {
+                  $cond: [
+                    { $gt: [{ $size: "$participants" }, 0] },
+                    { $ifNull: [{ $arrayElemAt: ["$participants.weight", 0] }, 0.5] },
+                    1
+                  ]
+                },
+                0
+              ]
+            },
           },
           approvedW: {
-            $sum: { $cond: [{ $eq: ["$status", "approved"] }, { $ifNull: ["$participants.weight", 0.5] }, 0] },
+            $sum: {
+              $cond: [
+                { $eq: ["$status", "approved"] },
+                {
+                  $cond: [
+                    { $gt: [{ $size: "$participants" }, 0] },
+                    { $ifNull: [{ $arrayElemAt: ["$participants.weight", 0] }, 0.5] },
+                    1
+                  ]
+                },
+                0
+              ]
+            },
           },
           rejectedW: {
-            $sum: { $cond: [{ $eq: ["$status", "rejected"] }, { $ifNull: ["$participants.weight", 0.5] }, 0] },
+            $sum: {
+              $cond: [
+                { $eq: ["$status", "rejected"] },
+                {
+                  $cond: [
+                    { $gt: [{ $size: "$participants" }, 0] },
+                    { $ifNull: [{ $arrayElemAt: ["$participants.weight", 0] }, 0.5] },
+                    1
+                  ]
+                },
+                0
+              ]
+            },
           },
           needsFixW: {
-            $sum: { $cond: [{ $eq: ["$status", "needs_fix"] }, { $ifNull: ["$participants.weight", 0.5] }, 0] },
+            $sum: {
+              $cond: [
+                { $eq: ["$status", "needs_fix"] },
+                {
+                  $cond: [
+                    { $gt: [{ $size: "$participants" }, 0] },
+                    { $ifNull: [{ $arrayElemAt: ["$participants.weight", 0] }, 0.5] },
+                    1
+                  ]
+                },
+                0
+              ]
+            },
           },
         },
       },
@@ -64,10 +130,25 @@ export async function perMarketer(req: Request, res: Response) {
   const { id } = req.params;
   const { from, to, page = 1, limit = 20 } = req.query as any;
 
-  const match: any = { "participants.marketerId": id };
+  // Access control: prevent marketers from reading other marketers' reports
+  const requesterId = (req as any).user?.id;
+  if (requesterId && requesterId !== id) {
+     res.status(403).json({ message: "Forbidden" });
+     return;
+  }
+
+  const match: any = {
+    $or: [
+      { "participants.marketerId": id },
+      { createdByMarketerId: id }
+    ]
+  };
   if (from || to) match.createdAt = {};
   if (from) match.createdAt.$gte = new Date(from);
   if (to) match.createdAt.$lte = new Date(to);
+
+  // Get active commission plan for commission calculation
+  const activeCommissionPlan = await CommissionPlan.findOne({ active: true });
 
   const [result] = await Onboarding.aggregate([
     { $match: match },
@@ -132,8 +213,49 @@ export async function perMarketer(req: Request, res: Response) {
                   ],
                 },
               },
+              commissionDueYER: {
+                $sum: {
+                  $cond: [
+                    { $eq: ["$status", "approved"] },
+                    {
+                      $multiply: [
+                        {
+                          $cond: [
+                            { $gt: [{ $size: "$participants" }, 0] },
+                            { $ifNull: [{ $arrayElemAt: ["$participants.weight", 0] }, 0.5] },
+                            1
+                          ]
+                        },
+                        activeCommissionPlan?.rules?.find(r => r.trigger === 'store_approved')?.amountYER || 0
+                      ],
+                    },
+                    0,
+                  ],
+                },
+              },
             },
           },
+        ],
+        timeseries: [
+          {
+            $group: {
+              _id: { y: { $year: "$createdAt" }, m: { $month: "$createdAt" } },
+              y: { $sum: 1 }
+            }
+          },
+          { $sort: { "_id.y": 1, "_id.m": 1 } },
+          {
+            $project: {
+              _id: 0,
+              x: {
+                $concat: [
+                  { $toString: "$_id.y" }, "-",
+                  { $cond: [{ $lt: ["$_id.m",10] }, { $concat: ["0", { $toString: "$_id.m" }] }, { $toString: "$_id.m" }] }
+                ]
+              },
+              y: 1
+            }
+          }
         ],
         totalCount: [{ $count: "count" }],
       },
@@ -185,6 +307,12 @@ export async function perMarketer(req: Request, res: Response) {
     needsFix: result?.totals?.needsFix || 0,
     approvalRate: result?.approvalRate || 0,
     approvalRateW: result?.approvalRateW || 0,
+    commission: {
+      dueYER: result?.totals?.commissionDueYER || 0,
+      paidYER: 0, // No payment tracking implemented yet
+      pendingYER: result?.totals?.commissionDueYER || 0, // = due - paid
+    },
+    timeseries: result?.timeseries || [],
     pagination: { page: +page, limit: +limit, total: result?.total || 0 },
     items: result?.items || [],
   });

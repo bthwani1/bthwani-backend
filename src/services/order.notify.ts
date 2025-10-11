@@ -2,6 +2,7 @@
 import { sendToUsers } from "./push.service";
 import { io } from "..";
 import NotificationPreference from "../models/NotificationPreference";
+import { User } from "../models/user";
 
 type OrderEvent =
   | "order.created"
@@ -69,4 +70,27 @@ export async function notifyOrder(
 
   // دفع عبر Expo
   await sendToUsers([order.user.toString()], { title, body, data, collapseId }, ["user"]);
+
+  // تخزين الإشعار في سجل المستخدم
+  try {
+    const user = await User.findById(order.user.toString());
+    if (user) {
+      user.notificationsFeed.unshift({
+        title,
+        body,
+        isRead: false,
+        createdAt: new Date(),
+      });
+
+      // الحفاظ على آخر 50 إشعار فقط لتجنب نمو السجل بشكل مفرط
+      if (user.notificationsFeed.length > 50) {
+        user.notificationsFeed = user.notificationsFeed.slice(0, 50);
+      }
+
+      await user.save({ validateModifiedOnly: true });
+    }
+  } catch (error) {
+    console.error("Failed to store notification in user feed:", error);
+    // لا تفشل الإشعار كاملاً لو فشل التخزين
+  }
 }

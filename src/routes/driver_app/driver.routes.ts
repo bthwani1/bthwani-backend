@@ -1,6 +1,7 @@
-// src/routes/driver/driverAppRoutes.ts
+// src/routes/driver_app/driver.routes.ts
 
 import express from "express";
+import { authenticate } from "../../middleware/auth.middleware";
 import {
   loginDriver,
   changePassword,
@@ -14,44 +15,48 @@ import {
   completeOrder,
   addReviewForUser,
 } from "../../controllers/driver_app/driver.controller";
-import { authenticate } from "../../middleware/auth.middleware";
 import {
   getAssignedOrders,
   listMyVacations,
   requestVacation,
+  getDriverReports,
 } from "../../controllers/driver_app/vacation.controller";
+import { getDriverWalletSummary } from "../../controllers/driver_app/driver.wallet.controller";
 
 const router = express.Router();
 
+// === Authentication & Profile ===
 router.post("/login", loginDriver);
-router.post("/vacations", authenticate, requestVacation);
-router.get("/vacations", authenticate, listMyVacations);
-router.get("/orders", authenticate, getAssignedOrders);
+router.patch("/change-password", authenticate, changePassword);
 
-router.patch("/change-password",authenticate, changePassword);
-
-router.patch("/location",authenticate, updateLocation);
-
-router.patch("/availability",authenticate, updateAvailability);
-
-
+// === Profile Management ===
 router.get("/me", authenticate, getMyProfile);
-
 router.patch("/me", authenticate, updateMyProfile);
 
-
+// === Location Management ===
+router.patch("/location", authenticate, updateLocation);
 router.post("/locations", authenticate, addOtherLocation);
-
-
 router.delete("/locations/:index", authenticate, deleteOtherLocation);
 
+// === Availability ===
+router.patch("/availability", authenticate, updateAvailability);
 
-router.get("/orders", authenticate, getMyOrders);
-
-
+// === Orders ===
+router.get("/orders", authenticate, getAssignedOrders);
+router.get("/my-orders", authenticate, getMyOrders);
 router.post("/complete/:orderId", authenticate, completeOrder);
 
-
+// === Reviews ===
 router.post("/review", authenticate, addReviewForUser);
+
+// === Vacations ===
+router.post("/vacations", authenticate, requestVacation);
+router.get("/vacations", authenticate, listMyVacations);
+
+// === Wallet ===
+router.get("/wallet/summary", authenticate, getDriverWalletSummary);
+
+// === Reports ===
+router.get("/reports", authenticate, getDriverReports);
 
 export default router;

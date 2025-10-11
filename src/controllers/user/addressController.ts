@@ -102,6 +102,12 @@ export const deleteAddress = async (req: Request, res: Response) => {
        return;
     }
 
+    // التحقق من أن العنوان المراد حذفه ليس الافتراضي
+    if (user.defaultAddressId && user.defaultAddressId.toString() === id) {
+      res.status(400).json({ message: 'لا يمكن حذف العنوان الافتراضي. يرجى تغيير العنوان الافتراضي أولاً.' });
+      return;
+    }
+
     // حذف العنوان بواسطة _id وليس index
     user.addresses = user.addresses.filter(
       (addr) => addr._id.toString() !== id

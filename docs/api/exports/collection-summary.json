@@ -1,0 +1,10 @@
+{
+  "name": "Bthwani API Collection",
+  "description": "Complete API collection for Bthwani platform covering Authentication, Orders, Wallet, Vendors, Drivers, and Accounting",
+  "requestCount": 24,
+  "environments": [
+    "local",
+    "staging",
+    "production"
+  ]
+}

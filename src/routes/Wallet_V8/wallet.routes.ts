@@ -15,6 +15,7 @@ import {
 } from "../../controllers/Wallet_V8/withdrawal.controller";
 import { verifyFirebase } from "../../middleware/verifyFirebase";
 import { verifyAdmin } from "../../middleware/verifyAdmin";
+import { audit } from "../../middleware/audit";
 
 const router = express.Router();
 
@@ -31,6 +32,6 @@ router.post("/withdraw-request", requestWithdrawal); // POST /api/v1/wallet/with
 
 // مسارات الأدمن فقط
 router.get("/admin/withdrawals", verifyAdmin, getAllWithdrawals);
-router.post("/admin/withdrawals/:id/process", verifyAdmin, processWithdrawal);
+router.post("/admin/withdrawals/:id/process", verifyAdmin, audit("wallet:processWithdrawal"), processWithdrawal);
 
 export default router;

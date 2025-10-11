@@ -10,6 +10,7 @@ export interface IMarketer extends Document {
   area?: string;
   status: "active" | "suspended";
   password: string; // bcrypt hash
+  expoPushToken?: string;
   deletedAt?: Date;
   deletionRequestedAt?: Date;
   createdAt: Date;
@@ -26,6 +27,7 @@ const MarketerSchema = new Schema<IMarketer>(
     area: { type: String },
     status: { type: String, enum: ["active", "suspended"], default: "active" },
     password: { type: String, required: true },
+    expoPushToken: { type: String },
     deletedAt: { type: Date },
     deletionRequestedAt: { type: Date },
   },

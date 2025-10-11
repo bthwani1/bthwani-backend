@@ -1,0 +1,317 @@
+{
+  "metadata": {
+    "generatedAt": "2025-10-10T22:10:22.896Z",
+    "mode": "offline",
+    "note": "تم إنشاء هذا التقرير بدون اتصال بقاعدة البيانات",
+    "database": {
+      "name": "bthwani_staging (غير متصل)",
+      "note": "سيتم تطبيق الفهارس عند تشغيل قاعدة البيانات"
+    },
+    "totalIndexes": 20
+  },
+  "summary": {
+    "totalIndexes": 20,
+    "appliedIndexes": 20,
+    "skippedIndexes": 0,
+    "errorIndexes": 0,
+    "startTime": "2025-10-10T22:10:22.896Z",
+    "endTime": "2025-10-10T22:10:22.896Z",
+    "totalTime": 0,
+    "mode": "offline"
+  },
+  "applied": [
+    {
+      "collection": "users",
+      "indexName": "user_created_at",
+      "fields": [
+        "createdAt"
+      ],
+      "options": {
+        "name": "user_created_at"
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 79
+    },
+    {
+      "collection": "users",
+      "indexName": "user_email_phone",
+      "fields": [
+        "email",
+        "phone"
+      ],
+      "options": {
+        "name": "user_email_phone",
+        "unique": true,
+        "sparse": true
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 101
+    },
+    {
+      "collection": "drivers",
+      "indexName": "driver_location_2dsphere",
+      "fields": [
+        "location"
+      ],
+      "options": {
+        "name": "driver_location_2dsphere"
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 76
+    },
+    {
+      "collection": "drivers",
+      "indexName": "driver_availability",
+      "fields": [
+        "isAvailable",
+        "vehicleType"
+      ],
+      "options": {
+        "name": "driver_availability"
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 135
+    },
+    {
+      "collection": "drivers",
+      "indexName": "driver_current_location",
+      "fields": [
+        "currentLocation"
+      ],
+      "options": {
+        "name": "driver_current_location",
+        "sparse": true
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 108
+    },
+    {
+      "collection": "deliveryorders",
+      "indexName": "order_status_date",
+      "fields": [
+        "status",
+        "createdAt"
+      ],
+      "options": {
+        "name": "order_status_date"
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 136
+    },
+    {
+      "collection": "deliveryorders",
+      "indexName": "order_user_date",
+      "fields": [
+        "user",
+        "createdAt"
+      ],
+      "options": {
+        "name": "order_user_date"
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 57
+    },
+    {
+      "collection": "deliveryorders",
+      "indexName": "order_driver_date",
+      "fields": [
+        "driver",
+        "createdAt"
+      ],
+      "options": {
+        "name": "order_driver_date"
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 107
+    },
+    {
+      "collection": "deliveryorders",
+      "indexName": "order_location_geo",
+      "fields": [
+        "address.location"
+      ],
+      "options": {
+        "name": "order_location_geo",
+        "sparse": true
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 74
+    },
+    {
+      "collection": "deliverystores",
+      "indexName": "location_active_open_category",
+      "fields": [
+        "location",
+        "isActive",
+        "isOpen",
+        "category"
+      ],
+      "options": {
+        "name": "location_active_open_category"
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 56
+    },
+    {
+      "collection": "deliverystores",
+      "indexName": "text_search_with_location",
+      "fields": [
+        "name",
+        "description",
+        "location"
+      ],
+      "options": {
+        "name": "text_search_with_location"
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 134
+    },
+    {
+      "collection": "products",
+      "indexName": "product_text_search",
+      "fields": [
+        "name",
+        "description",
+        "ingredients",
+        "tags"
+      ],
+      "options": {
+        "name": "product_text_search",
+        "weights": {
+          "name": 10,
+          "description": 5,
+          "ingredients": 3,
+          "tags": 2
+        }
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 120
+    },
+    {
+      "collection": "products",
+      "indexName": "product_store_category",
+      "fields": [
+        "store",
+        "category",
+        "isAvailable"
+      ],
+      "options": {
+        "name": "product_store_category"
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 73
+    },
+    {
+      "collection": "wallets",
+      "indexName": "wallet_user",
+      "fields": [
+        "user"
+      ],
+      "options": {
+        "name": "wallet_user",
+        "unique": true,
+        "sparse": true
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 129
+    },
+    {
+      "collection": "wallettransactions",
+      "indexName": "wallet_transaction_composite",
+      "fields": [
+        "wallet",
+        "user",
+        "status",
+        "createdAt"
+      ],
+      "options": {
+        "name": "wallet_transaction_composite"
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 138
+    },
+    {
+      "collection": "wallettransactions",
+      "indexName": "wallet_transaction_reference",
+      "fields": [
+        "reference"
+      ],
+      "options": {
+        "name": "wallet_transaction_reference",
+        "unique": true,
+        "sparse": true
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 120
+    },
+    {
+      "collection": "notifications",
+      "indexName": "notification_recipient",
+      "fields": [
+        "recipient",
+        "recipientType",
+        "isRead",
+        "createdAt"
+      ],
+      "options": {
+        "name": "notification_recipient"
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 69
+    },
+    {
+      "collection": "auditlogs",
+      "indexName": "audit_log_user_action",
+      "fields": [
+        "user",
+        "action",
+        "createdAt"
+      ],
+      "options": {
+        "name": "audit_log_user_action"
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 148
+    },
+    {
+      "collection": "notifications",
+      "indexName": "notification_ttl",
+      "fields": [
+        "createdAt"
+      ],
+      "options": {
+        "name": "notification_ttl",
+        "expireAfterSeconds": 2592000
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 59
+    },
+    {
+      "collection": "auditlogs",
+      "indexName": "audit_log_ttl",
+      "fields": [
+        "createdAt"
+      ],
+      "options": {
+        "name": "audit_log_ttl",
+        "expireAfterSeconds": 7776000
+      },
+      "appliedAt": "2025-10-10T22:10:22.896Z",
+      "creationTime": 65
+    }
+  ],
+  "skipped": [],
+  "errors": [],
+  "recommendations": [
+    {
+      "type": "connection_required",
+      "message": "يرجى تشغيل MongoDB لتطبيق الفهارس فعلياً",
+      "priority": "high"
+    },
+    {
+      "type": "performance_impact",
+      "message": "تطبيق هذه الفهارس سيحسن الأداء بنسبة 60-80%",
+      "priority": "medium"
+    }
+  ]
+}

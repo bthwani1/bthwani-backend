@@ -239,3 +239,148 @@ export const remove = async (req: Request, res: Response) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// Search products with advanced filtering
+export const searchProducts = async (req: Request, res: Response) => {
+  try {
+    const {
+      q,
+      categoryId,
+      subCategory,
+      storeId,
+      minPrice,
+      maxPrice,
+      isAvailable,
+      page = 1,
+      limit = 20,
+      sort = "relevance"
+    } = req.query;
+
+    // Validate and parse parameters
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit as string) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build search query
+    const searchQuery: any = {};
+
+    // Text search
+    if (q && (q as string).trim()) {
+      searchQuery.$text = { $search: (q as string).trim() };
+    }
+
+    // Category filter
+    if (categoryId) {
+      searchQuery.categoryId = categoryId;
+    }
+
+    // Sub-category filter
+    if (subCategory) {
+      searchQuery.subCategory = subCategory;
+    }
+
+    // Store filter
+    if (storeId) {
+      searchQuery.store = storeId;
+    }
+
+    // Price range filter
+    if (minPrice || maxPrice) {
+      searchQuery.price = {};
+      if (minPrice) searchQuery.price.$gte = parseFloat(minPrice as string);
+      if (maxPrice) searchQuery.price.$lte = parseFloat(maxPrice as string);
+    }
+
+    // Availability filter
+    if (isAvailable !== undefined) {
+      searchQuery.isAvailable = isAvailable === 'true';
+    }
+
+    // Build aggregation pipeline for search with sorting
+    const pipeline: any[] = [];
+
+    // Match stage
+    if (Object.keys(searchQuery).length > 0) {
+      pipeline.push({ $match: searchQuery });
+    }
+
+    // Sort stage
+    const sortStage: any = {};
+    switch (sort) {
+      case 'priceAsc':
+        sortStage.price = 1;
+        break;
+      case 'priceDesc':
+        sortStage.price = -1;
+        break;
+      case 'rating':
+        sortStage.rating = -1;
+        break;
+      case 'new':
+        sortStage.createdAt = -1;
+        break;
+      case 'relevance':
+      default:
+        // For text search relevance, use text score
+        if (q && (q as string).trim()) {
+          pipeline.push({ $addFields: { score: { $meta: "textScore" } } });
+          sortStage.score = { $meta: "textScore" };
+        } else {
+          sortStage.createdAt = -1; // Default sort by newest
+        }
+        break;
+    }
+
+    if (Object.keys(sortStage).length > 0) {
+      pipeline.push({ $sort: sortStage });
+    }
+
+    // Pagination
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: limitNum });
+
+    // Populate store information
+    pipeline.push({
+      $lookup: {
+        from: "deliverystores",
+        localField: "store",
+        foreignField: "_id",
+        as: "storeInfo"
+      }
+    });
+
+    pipeline.push({
+      $unwind: {
+        path: "$storeInfo",
+        preserveNullAndEmptyArrays: true
+      }
+    });
+
+    // Execute aggregation
+    const products = await DeliveryProduct.aggregate(pipeline);
+
+    // Get total count for pagination
+    const countPipeline = [...pipeline];
+    // Remove skip and limit from count pipeline
+    countPipeline.splice(-3); // Remove last 3 stages (skip, limit, lookup, unwind)
+
+    const totalCount = await DeliveryProduct.aggregate([
+      ...countPipeline,
+      { $count: "total" }
+    ]);
+
+    const total = totalCount.length > 0 ? totalCount[0].total : 0;
+
+    res.json({
+      items: products,
+      hasMore: skip + products.length < total,
+      total,
+      page: pageNum,
+      limit: limitNum
+    });
+
+  } catch (error: any) {
+    console.error('Error searching products:', error);
+    res.status(500).json({ message: "خطأ في البحث عن المنتجات" });
+  }
+};

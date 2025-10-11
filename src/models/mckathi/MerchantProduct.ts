@@ -20,6 +20,9 @@ export interface IMerchantProduct extends Document {
   customDescription?: string;
   section?: Types.ObjectId;
 
+  // مصدر المنتج
+  origin?: "catalog" | "merchant" | "imported";
+
   // جديد
   tags?: string[];
   rating?: number;
@@ -61,6 +64,9 @@ const MerchantProductSchema = new Schema<IMerchantProduct>(
     customImage:       { type: String },
     customDescription: { type: String },
 
+    // مصدر المنتج
+    origin: { type: String, enum: ["catalog", "merchant", "imported"], default: "catalog", index: true },
+
     section: { type: Schema.Types.ObjectId, ref: "StoreSection", index: true },
 
     // جديد
@@ -84,5 +90,7 @@ const MerchantProductSchema = new Schema<IMerchantProduct>(
 
 MerchantProductSchema.index({ store: 1, isAvailable: 1 });
 MerchantProductSchema.index({ store: 1, section: 1 });
+MerchantProductSchema.index({ origin: 1 });
+MerchantProductSchema.index({ origin: 1, store: 1 });
 
 export default model<IMerchantProduct>("MerchantProduct", MerchantProductSchema);

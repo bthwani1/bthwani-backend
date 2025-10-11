@@ -1,5 +1,6 @@
 // src/controllers/vendor_app/settlement.controller.ts
 import { Request, Response } from "express";
+import { parseListQuery } from "../../utils/query";
 import mongoose from "mongoose";
 import SettlementRequest, { ISettlementRequest } from "../../models/vendor_app/SettlementRequest";
 import Vendor from "../../models/vendor_app/Vendor";
@@ -184,29 +185,31 @@ export const getMyBalance = async (req: Request, res: Response) => {
 // جلب جميع طلبات التسوية (للإدارة)
 export const getAllSettlementRequests = async (req: Request, res: Response) => {
   try {
-    const { status, vendorId, page = 1, limit = 10 } = req.query;
+    const { page, perPage, sort, filters } = parseListQuery(req.query);
 
     const query: any = {};
-    if (status) query.status = status;
-    if (vendorId) query.vendor = vendorId;
+    if (filters?.status) query.status = filters.status;
+    if (filters?.vendorId) query.vendor = filters.vendorId;
 
+    const total = await SettlementRequest.countDocuments(query);
     const settlementRequests = await SettlementRequest.find(query)
       .populate("vendor", "fullName phone email")
       .populate("store", "name")
-      .sort({ requestedAt: -1 })
-      .limit(Number(limit))
-      .skip((Number(page) - 1) * Number(limit));
-
-    const total = await SettlementRequest.countDocuments(query);
+      .sort(sort ?? { requestedAt: -1 })
+      .skip((page - 1) * perPage)
+      .limit(perPage)
+      .lean();
 
     res.json({
       settlementRequests,
       pagination: {
-        page: Number(page),
-        limit: Number(limit),
+        page,
+        limit: perPage,
         total,
-        pages: Math.ceil(total / Number(limit))
-      }
+        pages: Math.ceil(total / perPage)
+      },
+      items: settlementRequests,
+      meta: { page, per_page: perPage, total, returned: settlementRequests.length },
     });
   } catch (err: any) {
     console.error("getAllSettlementRequests error:", err);

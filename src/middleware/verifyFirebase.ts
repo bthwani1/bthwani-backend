@@ -2,6 +2,7 @@
 import { adminAuth } from "../config/firebaseAdmin";
 console.log("[verifyFirebase] LOADED build:", new Date().toISOString());
 import { Request, Response, NextFunction } from "express";
+import { ERR } from "../utils/errors";
 
 // src/middleware/verifyFirebase.ts
 const CHECK_REVOKED = (process.env.FB_CHECK_REVOKED || "true") === "true";
@@ -11,10 +12,30 @@ export const verifyFirebase = async (req: Request, res: Response, next: NextFunc
     let token = (req.headers.authorization || "")
       .replace(/^Bearer\s+/i, "")
       .trim();
+
+    // Remove quotes if present
     token = token.replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1");
 
-    if (!token || token.split(".").length !== 3) {
-      res.status(401).json({ message: "Invalid token format" });
+    // More robust token validation
+    if (!token || token.length < 10) {
+      res.status(401).json({
+        error: {
+          code: "INVALID_TOKEN_FORMAT",
+          message: "Invalid token format - token too short or missing"
+        }
+      });
+      return;
+    }
+
+    // Check if token looks like a JWT (has 3 parts) or Firebase ID token (shorter)
+    const tokenParts = token.split(".");
+    if (tokenParts.length < 2 || tokenParts.length > 3) {
+      res.status(401).json({
+        error: {
+          code: "INVALID_TOKEN_FORMAT",
+          message: "Invalid token format - incorrect number of segments"
+        }
+      });
       return;
     }
 
@@ -41,11 +62,7 @@ export const verifyFirebase = async (req: Request, res: Response, next: NextFunc
       );
     } catch (e: any) {
       console.warn("[verifyFirebase] FAIL(no-check):", e?.code, e?.message);
-      res.status(401).json({
-        message: "Invalid token (decode failed)",
-        code: e?.code,
-        detail: e?.message,
-      });
+      res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Invalid token" }, detail: e?.message });
       return;
     }
 
@@ -63,18 +80,13 @@ export const verifyFirebase = async (req: Request, res: Response, next: NextFunc
         e?.code,
         e?.message
       );
-      const payload: any = {
-        message: "Invalid token",
-        code: e?.code,
-        detail: e?.message,
-      };
       // لو المشكلة مفاتيح جوجل/شبكة بتظهر هنا
-      res.status(401).json(payload);
+      res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Invalid token" }, detail: e?.message });
       return;
     }
   } catch (e: any) {
     console.error("[verifyFirebase] unexpected:", e);
-    res.status(401).json({ message: "Unauthorized", detail: e?.message || e });
+    res.status(401).json({ error: { code: "UNAUTHORIZED", message: "Unauthorized" }, detail: e?.message || e });
     return;
   }
 };
