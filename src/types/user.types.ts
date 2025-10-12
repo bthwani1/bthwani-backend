@@ -181,6 +181,7 @@ export interface UserType {
 
   wallet: Wallet;
   security: Security;
+  transactions: Transaction[];
   activityLog: ActivityLog[];
 }
 

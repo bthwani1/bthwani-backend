@@ -5,7 +5,13 @@ import { Request, Response, NextFunction } from "express";
 declare global {
   namespace Express {
     interface Request {
-      user?: { vendorId: string; role?: string };
+      user?: {
+        vendorId?: string;
+        role?: string;
+        id?: string;
+        uid?: string;
+        email?: string;
+      };
     }
   }
 }

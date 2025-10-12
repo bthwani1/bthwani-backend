@@ -178,15 +178,3 @@ export interface CommissionRuleFilters extends BaseFilter {
 }
 
 // Export these types for use in controllers and services
-export type {
-  WalletState,
-  SettlementStatus,
-  PayoutStatus,
-  OwnerType,
-  AccountType,
-  TransactionType,
-  EventType,
-  ReferenceType,
-  CommissionBasis,
-  SupportedCurrency
-};

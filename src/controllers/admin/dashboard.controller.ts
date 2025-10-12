@@ -639,7 +639,8 @@ export async function updateSupportTicketStatus(req: Request, res: Response) {
     const { status, assignee } = req.body;
 
     if (!status) {
-      return res.status(400).json({ message: "حالة نقطة الدعم مطلوبة" });
+      res.status(400).json({ message: "حالة نقطة الدعم مطلوبة" });
+      return;
     }
 
     const updateData: any = { status };
@@ -660,7 +661,8 @@ export async function updateSupportTicketStatus(req: Request, res: Response) {
     );
 
     if (!ticket) {
-      return res.status(404).json({ message: "نقطة الدعم غير موجودة" });
+      res.status(404).json({ message: "نقطة الدعم غير موجودة" });
+      return;
     }
 
     res.json({
@@ -684,12 +686,14 @@ export async function addSupportTicketNote(req: Request, res: Response) {
     const { note, internal } = req.body;
 
     if (!note || !note.trim()) {
-      return res.status(400).json({ message: "الملاحظة مطلوبة" });
+      res.status(400).json({ message: "الملاحظة مطلوبة" });
+      return;
     }
 
     const ticket = await SupportTicket.findById(id);
     if (!ticket) {
-      return res.status(404).json({ message: "نقطة الدعم غير موجودة" });
+          res.status(404).json({ message: "نقطة الدعم غير موجودة" });
+      return;
     }
 
     // إضافة الملاحظة إلى التذكرة (يمكن توسيع هذا لاحقًا لحفظ الملاحظات بشكل منفصل)

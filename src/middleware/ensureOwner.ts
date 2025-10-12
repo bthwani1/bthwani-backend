@@ -13,15 +13,17 @@ export async function ensureOwner(
     const resourceId = req.params.id || req.params.resourceId;
 
     if (!resourceId) {
-      return res.status(400).json({
+       res.status(400).json({
         error: { code: "MISSING_RESOURCE_ID", message: "Resource ID is required" }
       });
+      return;
     }
 
     if (!req.user?.uid) {
-      return res.status(401).json({
+         res.status(401).json({
         error: { code: "AUTHENTICATION_REQUIRED", message: "Authentication required" }
       });
+      return;
     }
 
     // Import models dynamically to avoid circular dependencies
@@ -42,18 +44,20 @@ export async function ensureOwner(
       const resource = await Model.findById(resourceId).lean();
 
       if (!resource) {
-        return res.status(404).json({
+         res.status(404).json({
           error: { code: "RESOURCE_NOT_FOUND", message: "Resource not found" }
         });
+        return;
       }
 
       // Check ownership - flexible field matching
       const resourceOwnerId = resource[ownerField] || resource.userId || resource.ownerId || resource.driverId;
 
       if (resourceOwnerId !== req.user.uid) {
-        return res.status(403).json({
+         res.status(403).json({
           error: { code: "ACCESS_DENIED", message: "You don't have permission to access this resource" }
         });
+        return;
       }
 
       // Attach resource to request for use in controller
@@ -93,11 +97,13 @@ export async function ensureOwnerOrAdmin(
   try {
     // Check if user is admin first
     if (req.user?.role === 'admin' || req.user?.role === 'superadmin') {
-      return next();
+      next();
+      return;
     }
 
     // If not admin, check ownership
-    return ensureOwner(req, res, next, resourceType, ownerField);
+    ensureOwner(req, res, next, resourceType, ownerField);
+    return;
   } catch (error) {
     console.error('ensureOwnerOrAdmin error:', error);
     res.status(500).json({

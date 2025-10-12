@@ -180,7 +180,7 @@ describe('FinanceExportService', () => {
       });
 
       expect(result.dataSummary.totalRecords).toBe(25000);
-      expect(result.content.split('\n').length).toBeGreaterThan(25000);
+      expect((result.content as string).split('\n').length).toBeGreaterThan(25000);
     });
   });
 
@@ -194,7 +194,7 @@ describe('FinanceExportService', () => {
         endDate: new Date('2025-01-15')
       });
 
-      const lines = result.content.split('\n');
+      const lines = (result.content as string).split('\n');
       expect(lines.length).toBe(3); // عناوين + سطرين من البيانات
 
       // التحقق من العناوين
